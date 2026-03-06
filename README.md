@@ -5,20 +5,23 @@ An end-to-end data pipeline that collects supermarket food prices, stores them i
 This project aims to monitor food prices across multiple supermarkets and build a dataset for economic and food price analysis.
 
 ---
-
-# Architecture
-
-Web Scraping  
-↓  
-Cloud PostgreSQL  
-↓  
-Data Cleaning  
-↓  
-Data Analysis  
-↓  
-Time Series Forecasting  
-↓  
-Interactive Dashboard  
+        Web Scraping
+    (Migros / Carrefour / A101)
+                │
+                ▼
+         Data Cleaning
+                │
+                ▼
+        Cloud PostgreSQL
+                │
+                ▼
+         Data Analysis
+                │
+                ▼
+       Time Series Forecast
+                │
+                ▼
+        Streamlit Dashboard
 
 ---
 
@@ -32,6 +35,31 @@ Streamlit
 GitHub  
 
 ---
+
+# Repository Structure
+food-price-intelligence
+│
+├── scraper
+│   ├── migros_scraper.py
+│   ├── carrefour_scraper.py
+│   └── a101_scraper.py
+│
+├── database
+│   └── schema.sql
+│
+├── pipeline
+│   └── run_pipeline.py
+│
+├── analysis
+│   └── price_analysis.py
+│
+├── models
+│   └── forecast_model.py
+│
+├── dashboard
+│   └── streamlit_app.py
+│
+└── README.md
 
 # Current Features
 
