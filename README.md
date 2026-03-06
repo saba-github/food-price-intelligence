@@ -37,6 +37,26 @@ Streamlit Dashboard
 
 ---
 
+## Example Analysis
+
+Planned analyses include:
+
+- Market price comparison
+- Cheapest market detection
+- Product price trends
+- Food price inflation index
+
+Example question:
+
+> Which supermarket consistently offers the cheapest rice prices?
+
+The project will analyze historical price observations to answer these questions.
+
+
+
+
+
+
 ## Repository Structure
 
 ```
@@ -175,4 +195,13 @@ This project demonstrates key data engineering and data science skills:
 - Forecasting
 - Dashboard development
 
-The goal is to build a real-world **data product that tracks and analyzes food price dynamics**.
+## Future Vision
+
+The long-term goal of this project is to evolve into a **Food Price Intelligence Platform** that:
+
+- Tracks supermarket prices automatically
+- Detects abnormal price changes
+- Estimates food inflation trends
+- Provides forecasting tools for price movements
+
+Such a system could support economic monitoring and consumer transparency.
