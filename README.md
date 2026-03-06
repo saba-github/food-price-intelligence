@@ -37,7 +37,9 @@ Streamlit Dashboard
 
 ---
 
-# Repository Structure
+## Repository Structure
+
+```
 food-price-intelligence
 │
 ├── scraper
@@ -61,7 +63,7 @@ food-price-intelligence
 │   └── streamlit_app.py
 │
 └── README.md
-
+```
 # Current Features
 
 - Scrapes food prices from Migros
