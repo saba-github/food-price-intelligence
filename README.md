@@ -5,6 +5,7 @@ An end-to-end data pipeline that collects supermarket food prices, stores them i
 This project aims to monitor food prices across multiple supermarkets and build a dataset for economic and food price analysis.
 
 ---
+## Architecture
         Web Scraping
     (Migros / Carrefour / A101)
                 │
