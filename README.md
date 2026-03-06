@@ -1,4 +1,4 @@
-# Food Price Intelligence System
+# 📊 Food Price Intelligence System
 
 An end-to-end data pipeline that collects supermarket food prices, stores them in a cloud PostgreSQL database, and analyzes price trends to support forecasting and market comparison.
 
@@ -6,34 +6,34 @@ This project aims to monitor food prices across multiple supermarkets and build 
 
 ---
 ## Architecture
-        Web Scraping
-    (Migros / Carrefour / A101)
-                │
-                ▼
-         Data Cleaning
-                │
-                ▼
-        Cloud PostgreSQL
-                │
-                ▼
-         Data Analysis
-                │
-                ▼
-       Time Series Forecast
-                │
-                ▼
-        Streamlit Dashboard
 
----
-
+```
+Web Scraping
+(Migros / Carrefour / A101)
+        │
+        ▼
+Data Cleaning
+        │
+        ▼
+Cloud PostgreSQL
+        │
+        ▼
+Data Analysis
+        │
+        ▼
+Time Series Forecast
+        │
+        ▼
+Streamlit Dashboard
+```
 # Tech Stack
 
-Python  
-Playwright  
-PostgreSQL (Neon)  
-Pandas  
-Streamlit  
-GitHub  
+- Python
+- Playwright
+- PostgreSQL (Neon)
+- Pandas
+- Streamlit
+- GitHub
 
 ---
 
