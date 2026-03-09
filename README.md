@@ -1,31 +1,62 @@
 # 📊 Food Price Intelligence System
 
-An end-to-end data pipeline that collects supermarket food prices, stores them in a cloud PostgreSQL database, and analyzes price trends to support forecasting and market comparison.
+*A layered data engineering pipeline for supermarket food price intelligence.*
 
-This project aims to monitor food prices across multiple supermarkets and build a dataset for economic and food price analysis.
+Food Price Intelligence is a layered data engineering project that captures, standardizes, models, and serves supermarket price observations for historical analysis and market intelligence.
+
+The system is designed as a reproducible data pipeline where raw data is retained, transformations are layered, and analytical datasets are built on top of reliable historical observations.
 
 ---
-## Architecture
+
+# Architecture
+
 
 ```
-Web Scraping
-(Migros / Carrefour / A101)
+Source Websites (Migros / Carrefour / A101)
         │
         ▼
-Data Cleaning
+Raw Price Event Capture
         │
         ▼
-Cloud PostgreSQL
+Standardized Staging Observations
         │
         ▼
-Data Analysis
+Canonical Product Mapping
         │
         ▼
-Time Series Forecast
+Fact Price Observations
         │
         ▼
-Streamlit Dashboard
+Serving Layer (Analysis / Dashboard / Forecasting)
 ```
+
+---
+
+# Design Principles
+
+The system follows modern data engineering design patterns:
+
+- Raw data is always retained
+- Data transformations are layered
+- Pipeline runs are traceable
+- Observations are append-only
+- Analytical datasets are reproducible
+- Product identities are canonicalized across sources
+
+---
+
+# Data Flow
+
+The data pipeline follows a layered structure:
+
+1. Scrapers extract raw product data from supermarket websites.
+2. Raw events are stored in the database without modification.
+3. Parsing and normalization produce standardized observations.
+4. Canonical product identities are mapped across sources.
+5. Analytical fact tables are built for price analysis and forecasting.
+
+---
+
 # Tech Stack
 
 - Python
@@ -37,7 +68,44 @@ Streamlit Dashboard
 
 ---
 
-## Example Analysis
+# Repository Structure
+
+food-price-intelligence
+│
+├── scraper
+│ ├── migros
+│ │ ├── extract.py
+│ │ ├── parse.py
+│ │ └── selectors.py
+│
+├── pipeline
+│ ├── run_migros_pipeline.py
+│ ├── load_raw.py
+│ ├── build_staging.py
+│ ├── build_fact.py
+│ └── quality_checks.py
+│
+├── database
+│ ├── migrations
+│ │ ├── 001_create_scrape_runs.sql
+│ │ ├── 002_create_raw_price_events.sql
+│ │ ├── 003_create_stg_price_observations.sql
+│ │ └── 004_create_fact_price_observations.sql
+│
+├── analysis
+│ └── price_analysis.py
+│
+├── dashboard
+│ └── streamlit_app.py
+│
+├── docs
+│ └── architecture.md
+│
+└── README.md
+
+---
+
+# Example Analysis
 
 Planned analyses include:
 
@@ -52,38 +120,8 @@ Example question:
 
 The project will analyze historical price observations to answer these questions.
 
+---
 
-
-
-
-
-## Repository Structure
-
-```
-food-price-intelligence
-│
-├── scraper
-│   ├── migros_scraper.py
-│   ├── carrefour_scraper.py
-│   └── a101_scraper.py
-│
-├── database
-│   └── schema.sql
-│
-├── pipeline
-│   └── run_pipeline.py
-│
-├── analysis
-│   └── price_analysis.py
-│
-├── models
-│   └── forecast_model.py
-│
-├── dashboard
-│   └── streamlit_app.py
-│
-└── README.md
-```
 # Current Features
 
 - Scrapes food prices from Migros
@@ -130,6 +168,7 @@ Goal: collect daily price observations for essential food products.
 Store and organize price observations in a cloud PostgreSQL database.
 
 Tasks:
+
 - Store price observations
 - Build historical price dataset
 - Normalize product names and units
@@ -161,10 +200,12 @@ Example analysis questions:
 Build time series forecasting models.
 
 Planned models:
+
 - Prophet
 - ARIMA (optional)
 
 Goals:
+
 - Predict food prices for the next 14 days
 - Identify potential price spikes
 - Detect price anomalies
@@ -195,13 +236,34 @@ This project demonstrates key data engineering and data science skills:
 - Forecasting
 - Dashboard development
 
-## Future Vision
+---
 
-The long-term goal of this project is to evolve into a **Food Price Intelligence Platform** that:
+# Future Vision
 
-- Tracks supermarket prices automatically
-- Detects abnormal price changes
-- Estimates food inflation trends
-- Provides forecasting tools for price movements
+The long-term goal is to evolve the system into a **Food Price Intelligence Platform** capable of:
 
-Such a system could support economic monitoring and consumer transparency.
+- Automatically tracking supermarket prices
+- Building a historical food price dataset
+- Detecting abnormal price changes
+- Estimating food inflation trends
+- Supporting economic and consumer price analysis
+
+---
+
+# Development Status
+
+Current progress:
+
+- Migros scraping implemented
+- PostgreSQL cloud database connected
+- Historical price observation storage available
+- Layered data pipeline architecture in progress
+- Run-level pipeline tracking being added
+
+Planned next steps:
+
+- Implement run-level pipeline metadata
+- Introduce raw price event capture
+- Build staging layer for standardized observations
+- Implement canonical product mapping
+- Build analytical fact tables
