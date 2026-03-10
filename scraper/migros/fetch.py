@@ -3,7 +3,7 @@ import requests
 from scraper.migros.extract import parse_migros_products
 
 
-BASE_URL = "https://www.migros.com.tr/rest/search/screens/products"
+SEARCH_BASE_URL = "https://www.migros.com.tr/rest/search/screens/products"
 
 
 def get_migros_products(query: str = "domates") -> list[dict]:
@@ -14,10 +14,13 @@ def get_migros_products(query: str = "domates") -> list[dict]:
     headers = {
         "User-Agent": "Mozilla/5.0",
         "Accept": "application/json",
+        "x-device-pwa": "true",
+        "x-forwarded-rest": "true",
+        "x-pwa": "true",
     }
 
     response = requests.get(
-        BASE_URL,
+        SEARCH_BASE_URL,
         params=params,
         headers=headers,
         timeout=30,
