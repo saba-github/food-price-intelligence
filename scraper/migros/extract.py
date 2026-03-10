@@ -1,43 +1,205 @@
-from playwright.sync_api import sync_playwright
+from __future__ import annotations
+
+from typing import Any
 
 
-def extract_migros_products():
-    products = []
+BASE_URL = "https://www.migros.com.tr"
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
 
-        page.goto("https://www.migros.com.tr/arama?q=pirin%C3%A7", timeout=60000)
-        page.wait_for_timeout(5000)
+def _safe_get(dct: dict[str, Any] | None, key: str, default: Any = None) -> Any:
+    if not isinstance(dct, dict):
+        return default
+    return dct.get(key, default)
 
-        product_cards = page.locator("div[class*='mdc-card']").all()
 
-        for card in product_cards[:10]:
-            try:
-                name = card.locator("h5, h6, p").first.text_content()
-            except:
-                name = None
+def _price_to_tl(value: Any) -> float | None:
+    """
+    Migros API fiyatları genelde kuruş bazlı geliyor.
+    Örn: 4495 -> 44.95 TL
+    """
+    if value is None:
+        return None
 
-            try:
-                price_text = card.locator("span").nth(0).text_content()
-            except:
-                price_text = None
+    try:
+        return round(float(value) / 100, 2)
+    except (TypeError, ValueError):
+        return None
 
-            try:
-                url = card.locator("a").first.get_attribute("href")
-                if url and not url.startswith("http"):
-                    url = "https://www.migros.com.tr" + url
-            except:
-                url = None
 
-            if name:
-                products.append({
-                    "product_name": name.strip() if name else None,
-                    "price_text": price_text.strip() if price_text else None,
-                    "product_url": url
-                })
+def _extract_category_hierarchy(category_ascendants: list[dict[str, Any]] | None) -> dict[str, str | None]:
+    """
+    Örnek:
+    [
+        {"name": "Sebze", "id": ..., "prettyName": ...},
+        {"name": "Meyve, Sebze", "id": ..., "prettyName": ...}
+    ]
 
-        browser.close()
+    Genelde yakın-alt -> üst gibi geliyor.
+    Biz burada güvenli şekilde isimleri ayırıyoruz.
+    """
+    if not category_ascendants:
+        return {
+            "parent_category_name": None,
+            "top_category_name": None,
+            "parent_category_id": None,
+            "top_category_id": None,
+            "parent_category_pretty_name": None,
+            "top_category_pretty_name": None,
+        }
+
+    parent = category_ascendants[0] if len(category_ascendants) >= 1 else {}
+    top = category_ascendants[-1] if len(category_ascendants) >= 1 else {}
+
+    return {
+        "parent_category_name": _safe_get(parent, "name"),
+        "top_category_name": _safe_get(top, "name"),
+        "parent_category_id": _safe_get(parent, "id"),
+        "top_category_id": _safe_get(top, "id"),
+        "parent_category_pretty_name": _safe_get(parent, "prettyName"),
+        "top_category_pretty_name": _safe_get(top, "prettyName"),
+    }
+
+
+def _extract_image_urls(images: list[dict[str, Any]] | None) -> dict[str, str | None]:
+    if not images:
+        return {
+            "image_product_list": None,
+            "image_product_detail": None,
+            "image_product_hd": None,
+            "image_cart": None,
+        }
+
+    first_image = images[0] if images else {}
+    urls = _safe_get(first_image, "urls", {}) or {}
+
+    return {
+        "image_product_list": _safe_get(urls, "PRODUCT_LIST"),
+        "image_product_detail": _safe_get(urls, "PRODUCT_DETAIL"),
+        "image_product_hd": _safe_get(urls, "PRODUCT_HD"),
+        "image_cart": _safe_get(urls, "CART"),
+    }
+
+
+def _extract_badges(badges: list[dict[str, Any]] | None) -> list[str]:
+    if not badges:
+        return []
+
+    cleaned_badges: list[str] = []
+    for badge in badges:
+        value = _safe_get(badge, "value")
+        if value:
+            cleaned_badges.append(str(value).strip())
+
+    return cleaned_badges
+
+
+def _build_product_url(pretty_name: str | None) -> str | None:
+    if not pretty_name:
+        return None
+    return f"{BASE_URL}/{pretty_name}"
+
+
+def parse_migros_products(api_json: dict[str, Any]) -> list[dict[str, Any]]:
+    """
+    Migros API response'unu normalize eder.
+
+    Beklenen genel yapı:
+    {
+        "successful": true,
+        "violations": [],
+        "data": [ ... ürünler ... ]
+    }
+    """
+    products: list[dict[str, Any]] = []
+
+    data = api_json.get("data", [])
+    if not isinstance(data, list):
+        return products
+
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+
+        brand = _safe_get(item, "brand", {}) or {}
+        category = _safe_get(item, "category", {}) or {}
+        category_ascendants = _safe_get(item, "categoryAscendants", []) or []
+        images = _safe_get(item, "images", []) or []
+        badges = _safe_get(item, "badges", []) or []
+        social = _safe_get(item, "socialProofInfo", {}) or {}
+
+        category_info = _extract_category_hierarchy(category_ascendants)
+        image_info = _extract_image_urls(images)
+        badge_values = _extract_badges(badges)
+
+        pretty_name = _safe_get(item, "prettyName")
+        product_url = _build_product_url(pretty_name)
+
+        record = {
+            # Kimlik alanları
+            "product_id": _safe_get(item, "id"),
+            "store_id": _safe_get(item, "storeId"),
+            "sku": _safe_get(item, "sku"),
+            "pretty_name": pretty_name,
+            "product_url": product_url,
+
+            # Temel ürün alanları
+            "product_name": _safe_get(item, "name"),
+            "status": _safe_get(item, "status"),
+            "sponsored": _safe_get(item, "sponsored"),
+            "buy_now_applicable": _safe_get(item, "buyNowApplicable"),
+            "product_note_appendable": _safe_get(item, "productNoteAppendable"),
+
+            # Marka
+            "brand_id": _safe_get(brand, "id"),
+            "brand_name": _safe_get(brand, "name"),
+            "brand_pretty_name": _safe_get(brand, "prettyName"),
+
+            # Ana kategori
+            "category_id": _safe_get(category, "id"),
+            "category_name": _safe_get(category, "name"),
+            "category_pretty_name": _safe_get(category, "prettyName"),
+
+            # Kategori hiyerarşisi
+            **category_info,
+
+            # Birim / satış mantığı
+            "unit": _safe_get(item, "unit"),
+            "unit_amount": _safe_get(item, "unitAmount"),
+            "initial_increment_amount": _safe_get(item, "initialIncrementAmount"),
+            "increment_amount": _safe_get(item, "incrementAmount"),
+            "max_amount": _safe_get(item, "maxAmount"),
+
+            "alternative_unit": _safe_get(item, "alternativeUnit"),
+            "alternative_unit_value": _safe_get(item, "alternativeUnitValue"),
+            "alternative_unit_initial_increment_amount": _safe_get(item, "alternativeUnitInitialIncrementAmount"),
+            "alternative_unit_increment_amount": _safe_get(item, "alternativeUnitIncrementAmount"),
+            "alternative_unit_max_amount": _safe_get(item, "alternativeUnitMaxAmount"),
+            "use_only_alternative_unit": _safe_get(item, "useOnlyAlternativeUnit"),
+
+            # Fiyatlar
+            "regular_price_raw": _safe_get(item, "regularPrice"),
+            "shown_price_raw": _safe_get(item, "shownPrice"),
+            "regular_price_tl": _price_to_tl(_safe_get(item, "regularPrice")),
+            "shown_price_tl": _price_to_tl(_safe_get(item, "shownPrice")),
+            "discount_rate": _safe_get(item, "discountRate"),
+            "unit_price_text": _safe_get(item, "unitPrice"),
+
+            # Badge / sosyal kanıt
+            "badges": badge_values,
+            "social_proof_priority": _safe_get(social, "socialProofPriority"),
+            "social_proof_category_id": _safe_get(social, "categoryId"),
+            "social_proof_category_name": _safe_get(social, "categoryName"),
+            "social_proof_description": _safe_get(social, "description"),
+
+            # Görseller
+            **image_info,
+
+            # Event / misc
+            "referrer_event_id": _safe_get(item, "referrerEventId"),
+            "crm_discount_tags": _safe_get(item, "crmDiscountTags", []),
+            "group_badge_map": _safe_get(item, "groupBadgeMap", {}),
+        }
+
+        products.append(record)
 
     return products
