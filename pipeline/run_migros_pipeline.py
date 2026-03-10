@@ -1,10 +1,9 @@
 import os
-import re
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 
-from scraper.migros.extract import extract_migros_products
+from scraper.migros.categories import get_migros_category_products
 
 load_dotenv()
 
@@ -19,26 +18,12 @@ def get_connection():
     )
 
 
-def parse_price(price_text):
-    if not price_text:
-        return None
-
-    cleaned = price_text.replace("TL", "").replace("₺", "").strip()
-    cleaned = cleaned.replace(".", "").replace(",", ".")
-
-    match = re.search(r"\d+(\.\d+)?", cleaned)
-    if match:
-        return float(match.group(0))
-
-    return None
-
-
-def start_run(cursor):
+def start_run(cursor, category_slug: str):
     cursor.execute("""
-        INSERT INTO scrape_runs (source_name, status)
-        VALUES ('migros', 'running')
+        INSERT INTO scrape_runs (source_name, status, notes)
+        VALUES ('migros', 'running', %s)
         RETURNING run_id
-    """)
+    """, (f"category_slug={category_slug}",))
     return cursor.fetchone()[0]
 
 
@@ -62,15 +47,32 @@ def fail_run(cursor, run_id, error_message):
     """, (error_message, run_id))
 
 
-def insert_raw_event(cursor, run_id, product_name, price, url, raw_payload):
+def insert_raw_event(cursor, run_id, product, category_slug):
     cursor.execute("""
         INSERT INTO raw_price_events
-        (run_id, source_name, product_name, product_url, price, currency, raw_payload)
+        (
+            run_id,
+            source_name,
+            product_name,
+            product_url,
+            price,
+            currency,
+            raw_payload
+        )
         VALUES (%s, 'migros', %s, %s, %s, 'TRY', %s)
-    """, (run_id, product_name, url, price, psycopg2.extras.Json(raw_payload)))
+    """, (
+        run_id,
+        product.get("product_name"),
+        product.get("product_url"),
+        product.get("shown_price_tl"),
+        psycopg2.extras.Json({
+            "category_slug": category_slug,
+            **product
+        })
+    ))
 
 
-def run_pipeline():
+def run_pipeline(category_slug: str = "meyve-sebze-c-2"):
 
     conn = get_connection()
     cursor = conn.cursor()
@@ -78,36 +80,27 @@ def run_pipeline():
     run_id = None
 
     try:
-
-        run_id = start_run(cursor)
+        run_id = start_run(cursor, category_slug)
         conn.commit()
 
-        scraped_products = extract_migros_products()
+        scraped_products = get_migros_category_products(category_slug)
 
         for product in scraped_products:
-
-            product_name = product.get("product_name")
-            price_text = product.get("price_text")
-            product_url = product.get("product_url")
-
-            price = parse_price(price_text)
-
             insert_raw_event(
-                cursor,
-                run_id,
-                product_name,
-                price,
-                product_url,
-                product
+                cursor=cursor,
+                run_id=run_id,
+                product=product,
+                category_slug=category_slug
             )
 
         finish_run(cursor, run_id, len(scraped_products))
         conn.commit()
 
         print(f"Pipeline finished successfully. Run ID: {run_id}")
+        print(f"Category: {category_slug}")
+        print(f"Records scraped: {len(scraped_products)}")
 
     except Exception as e:
-
         if run_id is not None:
             fail_run(cursor, run_id, str(e))
             conn.commit()
@@ -120,4 +113,4 @@ def run_pipeline():
 
 
 if __name__ == "__main__":
-    run_pipeline()
+    run_pipeline("meyve-sebze-c-2")
