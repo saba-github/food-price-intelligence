@@ -1,4 +1,4 @@
-CREATE TABLE raw_price_events (
+CREATE TABLE IF NOT EXISTS raw_price_events (
 
     event_id SERIAL PRIMARY KEY,
 
