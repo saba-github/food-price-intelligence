@@ -1,4 +1,4 @@
-CREATE TABLE scrape_runs (
+CREATE TABLE IF NOT EXISTS scrape_runs (
 
     run_id SERIAL PRIMARY KEY,
 
@@ -8,7 +8,7 @@ CREATE TABLE scrape_runs (
 
     finished_at TIMESTAMP,
 
-    status TEXT,
+    status TEXT CHECK (status IN ('running', 'success', 'failed')),
 
     records_scraped INTEGER,
 
