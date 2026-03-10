@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS fact_price_observations (
     normalized_unit TEXT,
     normalized_quantity NUMERIC,
 
-    price NUMERIC,
+    price NUMERIC CHECK (price >= 0),
     currency TEXT,
 
     observed_at TIMESTAMP NOT NULL,
