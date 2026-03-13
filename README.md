@@ -1,4 +1,4 @@
-# Food Price Intelligence System
+#  Food Price Intelligence System
 
 An end-to-end data pipeline that collects supermarket food prices, stores them in a cloud PostgreSQL database, and analyzes price trends to support forecasting and market comparison.
 
