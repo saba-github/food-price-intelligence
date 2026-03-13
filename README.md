@@ -1,4 +1,4 @@
-# 📊 Food Price Intelligence System
+# Food Price Intelligence System
 
 *A layered data engineering pipeline for supermarket food price intelligence.*
 
