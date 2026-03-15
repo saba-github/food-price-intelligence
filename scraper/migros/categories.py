@@ -26,18 +26,6 @@ def get_migros_category_products(category_slug: str = "meyve-sebze-c-2") -> list
 
     api_json = response.json()
 
-    print("TOP LEVEL KEYS:", list(api_json.keys()))
-    print("DATA TYPE:", type(api_json.get("data")).__name__)
-
-    data = api_json.get("data", {})
-    print("DATA KEYS:", list(data.keys())[:30])
-
-    search_info = data.get("searchInfo")
-    print("SEARCH_INFO TYPE:", type(search_info).__name__)
-
-    if isinstance(search_info, dict):
-        print("SEARCH_INFO KEYS:", list(search_info.keys())[:50])
-
     products = parse_migros_products(api_json)
     return products
 
