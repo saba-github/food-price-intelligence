@@ -17,13 +17,10 @@ CURRENCY = "TRY"
 
 
 def get_connection():
-    return psycopg2.connect(
-        host=os.getenv("DATABASE_HOST"),
-        database=os.getenv("DATABASE_NAME"),
-        user=os.getenv("DATABASE_USER"),
-        password=os.getenv("DATABASE_PASSWORD"),
-        port=os.getenv("DATABASE_PORT", "5432")
-    )
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        raise ValueError("DATABASE_URL environment variable is not set.")
+    return psycopg2.connect(database_url)
 
 
 def start_run(cursor):
@@ -267,12 +264,14 @@ def insert_fact_observation(
 
 
 def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
-    conn = get_connection()
-    cursor = conn.cursor()
-
+    conn = None
+    cursor = None
     run_id = None
 
     try:
+        conn = get_connection()
+        cursor = conn.cursor()
+
         run_id = start_run(cursor)
         conn.commit()
 
@@ -310,7 +309,7 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
         finish_run(cursor, run_id, raw_count)
         conn.commit()
 
-        print(f"Pipeline finished successfully.")
+        print("Pipeline finished successfully.")
         print(f"Run ID: {run_id}")
         print(f"Category: {category_slug}")
         print(f"Raw rows inserted: {raw_count}")
@@ -318,21 +317,22 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
         print(f"Fact rows inserted: {fact_count}")
 
     except Exception as e:
-        conn.rollback()
+        if conn is not None:
+            conn.rollback()
 
-        if run_id is not None:
+        if run_id is not None and cursor is not None:
             try:
                 fail_run(cursor, run_id, str(e))
                 conn.commit()
             except Exception:
-                conn.rollback()
+                if conn is not None:
+                    conn.rollback()
 
         print(f"Pipeline failed: {e}")
+        raise  # 🔥 BU ÇOK KRİTİK
 
     finally:
-        cursor.close()
-        conn.close()
-
-
-if __name__ == "__main__":
-    run_pipeline(DEFAULT_CATEGORY_SLUG)
+        if cursor is not None:
+            cursor.close()
+        if conn is not None:
+            conn.close()
