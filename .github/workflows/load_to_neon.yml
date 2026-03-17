@@ -27,4 +27,5 @@ jobs:
       - name: Run script
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONPATH: ${{ github.workspace }}
         run: python pipeline/run_migros_pipeline.py
