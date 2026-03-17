@@ -336,3 +336,5 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             cursor.close()
         if conn is not None:
             conn.close()
+if __name__ == "__main__":
+    run_pipeline(DEFAULT_CATEGORY_SLUG)
