@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 from typing import Any, Optional, Tuple
@@ -10,12 +11,26 @@ from scraper.migros.categories import get_migros_category_products
 
 load_dotenv()
 
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
 DEFAULT_CATEGORY_SLUG = "meyve-sebze-c-2"
 SOURCE_NAME = "migros"
 CURRENCY = "TRY"
 
 
+# ---------------------------------------------------------------------------
+# DB connection
+# ---------------------------------------------------------------------------
 def get_connection():
     database_url = os.getenv("DATABASE_URL")
     if not database_url:
@@ -23,99 +38,117 @@ def get_connection():
     return psycopg2.connect(database_url)
 
 
-def start_run(cursor):
-    cursor.execute("""
+# ---------------------------------------------------------------------------
+# Run lifecycle
+# ---------------------------------------------------------------------------
+def start_run(cursor, category_slug: str) -> int:
+    cursor.execute(
+        """
         INSERT INTO scrape_runs (source_name, status)
         VALUES (%s, 'running')
         RETURNING run_id
-    """, (SOURCE_NAME,))
-    return cursor.fetchone()[0]
+        """,
+        (SOURCE_NAME,),
+    )
+    run_id = cursor.fetchone()[0]
+    logger.info("Run started — run_id=%s  category=%s", run_id, category_slug)
+    return run_id
 
 
 def finish_run(cursor, run_id: int, records: int):
-    cursor.execute("""
+    cursor.execute(
+        """
         UPDATE scrape_runs
         SET finished_at = NOW(),
-            status = 'success',
+            status      = 'success',
             records_scraped = %s
         WHERE run_id = %s
-    """, (records, run_id))
+        """,
+        (records, run_id),
+    )
+    logger.info("Run finished — run_id=%s  records=%s", run_id, records)
 
 
 def fail_run(cursor, run_id: int, error_message: str):
-    cursor.execute("""
+    cursor.execute(
+        """
         UPDATE scrape_runs
-        SET finished_at = NOW(),
-            status = 'failed',
+        SET finished_at   = NOW(),
+            status        = 'failed',
             error_message = %s
         WHERE run_id = %s
-    """, (error_message[:5000], run_id))
+        """,
+        (error_message[:5000], run_id),
+    )
+    logger.error("Run failed — run_id=%s  error=%s", run_id, error_message[:200])
 
 
-def normalize_unit(unit: Optional[str], quantity: Any) -> Tuple[Optional[str], Optional[float]]:
+# ---------------------------------------------------------------------------
+# Normalization helpers
+# ---------------------------------------------------------------------------
+def normalize_unit(
+    unit: Optional[str], quantity: Any
+) -> Tuple[Optional[str], Optional[float]]:
     """
-    Kaynak birimini daha analize uygun hale getirir.
+    Kaynak birimi ve miktarı analiz için standartlaştırır.
 
-    Örnek:
-    - GRAM + 1000 -> ("kg", 1.0)
-    - GRAM + 400  -> ("g", 400.0)
-    - PIECE + 1   -> ("piece", 1.0)
+    Örnekler:
+        GRAM + 1000  →  ("kg", 1.0)
+        GRAM + 400   →  ("g",  400.0)
+        PIECE + 6    →  ("piece", 6.0)
+        None + any   →  (None, None)
     """
     if unit is None:
         return None, None
 
     unit_upper = str(unit).strip().upper()
 
-    try:
-        qty = float(quantity) if quantity is not None else None
-    except (TypeError, ValueError):
-        qty = None
+    qty: Optional[float] = None
+    if quantity is not None:
+        try:
+            qty = float(quantity)
+        except (TypeError, ValueError):
+            logger.warning(
+                "normalize_unit: could not parse quantity=%r for unit=%s", quantity, unit
+            )
 
     if unit_upper == "GRAM":
-        if qty == 1000:
-            return "kg", 1.0
-        return "g", qty
+        if qty is None:
+            logger.warning("normalize_unit: GRAM unit but quantity is None")
+            return "g", None
+        return ("kg", 1.0) if qty == 1000 else ("g", qty)
 
     if unit_upper == "PIECE":
         return "piece", qty if qty is not None else 1.0
 
+    # Fallback — unknown unit, keep as-is but lowercase
     return unit.lower(), qty
 
 
 def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
     """
-    Ürün adını karşılaştırma ve grouping için sadeleştirir.
-    Tam mükemmel canonicalization değil; ilk sağlam katman.
+    Ürün adını karşılaştırma ve gruplama için sadeleştirir.
+
+    Strateji: sayıyı çıkardıktan sonra birim kelimesini sil —
+    böylece "\bg\b" "göçmen" gibi kelimelerdeki harfleri etkilemez.
     """
     if not product_name:
         return None
 
     name = product_name.lower().strip()
 
-    replacements = {
-        "ı": "i",
-        "ğ": "g",
-        "ü": "u",
-        "ş": "s",
-        "ö": "o",
-        "ç": "c",
-    }
-
-    for old, new in replacements.items():
+    # Türkçe → ASCII
+    tr_map = {"ı": "i", "ğ": "g", "ü": "u", "ş": "s", "ö": "o", "ç": "c"}
+    for old, new in tr_map.items():
         name = name.replace(old, new)
 
-    # Yaygın birim/ambalaj kelimelerini sadeleştir
-    removable_patterns = [
-        r"\bkg\b",
-        r"\bgram\b",
-        r"\bg\b",
-        r"\badet\b",
-        r"\bdemet\b",
-        r"\bpaket\b",
-    ]
+    # "200g", "1kg", "500 gram" gibi sayı+birim bloklarını sil
+    # Önce sayılı birim ifadesini kaldır — tek başına "g" harfini değil
+    name = re.sub(r"\b\d+\s*(?:kg|g|gram|ml|l|lt|adet|demet|paket)\b", " ", name)
 
-    for pattern in removable_patterns:
-        name = re.sub(pattern, " ", name)
+    # Sayı olmadan kalan serbest birim kelimelerini de temizle
+    standalone_units = r"\b(?:kg|gram|adet|demet|paket)\b"
+    name = re.sub(standalone_units, " ", name)
 
     # Çoklu boşlukları temizle
     name = re.sub(r"\s+", " ", name).strip()
@@ -123,218 +156,210 @@ def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
     return name or None
 
 
-def insert_raw_event(cursor, run_id: int, product: dict[str, Any], category_slug: str) -> int:
-    """
-    Scraper'dan gelen ham ürünü raw tabloya yazar.
-    event_id döndürür.
-    """
-    raw_payload = {
-        "category_slug": category_slug,
-        **product
-    }
+# ---------------------------------------------------------------------------
+# Insert helpers
+# ---------------------------------------------------------------------------
+def insert_raw_event(
+    cursor, run_id: int, product: dict[str, Any], category_slug: str
+) -> int:
+    raw_payload = {"category_slug": category_slug, **product}
 
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO raw_price_events
-        (
-            run_id,
-            source_name,
-            product_name,
-            product_url,
-            price,
-            currency,
-            raw_payload
-        )
+            (run_id, source_name, product_name, product_url,
+             price, currency, raw_payload)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
         RETURNING event_id
-    """, (
-        run_id,
-        SOURCE_NAME,
-        product.get("product_name"),
-        product.get("product_url"),
-        product.get("shown_price_tl"),
-        CURRENCY,
-        psycopg2.extras.Json(raw_payload)
-    ))
-
+        """,
+        (
+            run_id,
+            SOURCE_NAME,
+            product.get("product_name"),
+            product.get("product_url"),
+            product.get("shown_price_tl"),
+            CURRENCY,
+            psycopg2.extras.Json(raw_payload),
+        ),
+    )
     return cursor.fetchone()[0]
 
 
 def insert_stg_observation(
-    cursor,
-    event_id: int,
-    run_id: int,
-    product: dict[str, Any],
+    cursor, event_id: int, run_id: int, product: dict[str, Any]
 ) -> int:
-    """
-    Raw event'ten normalize edilmiş staging kaydını oluşturur.
-    observation_id döndürür.
-    """
     normalized_unit, normalized_quantity = normalize_unit(
-        product.get("unit"),
-        product.get("unit_amount")
+        product.get("unit"), product.get("unit_amount")
     )
-
     standardized_name = standardize_product_name(product.get("product_name"))
 
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO stg_price_observations
+            (event_id, run_id, source_name, source_product_id, source_sku,
+             product_name, product_url, price, currency,
+             normalized_unit, normalized_quantity,
+             standardized_product_name, observed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        RETURNING observation_id
+        """,
         (
             event_id,
             run_id,
-            source_name,
-            source_product_id,
-            source_sku,
-            product_name,
-            product_url,
-            price,
-            currency,
+            SOURCE_NAME,
+            str(product["product_id"]) if product.get("product_id") is not None else None,
+            product.get("sku"),
+            product.get("product_name"),
+            product.get("product_url"),
+            product.get("shown_price_tl"),
+            CURRENCY,
             normalized_unit,
             normalized_quantity,
-            standardized_product_name,
-            observed_at
-        )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-        RETURNING observation_id
-    """, (
-        event_id,
-        run_id,
-        SOURCE_NAME,
-        str(product.get("product_id")) if product.get("product_id") is not None else None,
-        product.get("sku"),
-        product.get("product_name"),
-        product.get("product_url"),
-        product.get("shown_price_tl"),
-        CURRENCY,
-        normalized_unit,
-        normalized_quantity,
-        standardized_name,
-    ))
-
+            standardized_name,
+        ),
+    )
     return cursor.fetchone()[0]
 
 
 def insert_fact_observation(
-    cursor,
-    observation_id: int,
-    run_id: int,
-    product: dict[str, Any],
+    cursor, observation_id: int, run_id: int, product: dict[str, Any]
 ):
-    """
-    Analize hazır fact kaydını oluşturur.
-    """
     normalized_unit, normalized_quantity = normalize_unit(
-        product.get("unit"),
-        product.get("unit_amount")
+        product.get("unit"), product.get("unit_amount")
     )
-
     standardized_name = standardize_product_name(product.get("product_name"))
 
-    cursor.execute("""
+    cursor.execute(
+        """
         INSERT INTO fact_price_observations
+            (observation_id, run_id, source_name, source_product_id, source_sku,
+             product_name, standardized_product_name, product_url,
+             normalized_unit, normalized_quantity,
+             price, currency, observed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        """,
         (
             observation_id,
             run_id,
-            source_name,
-            source_product_id,
-            source_sku,
-            product_name,
-            standardized_product_name,
-            product_url,
+            SOURCE_NAME,
+            str(product["product_id"]) if product.get("product_id") is not None else None,
+            product.get("sku"),
+            product.get("product_name"),
+            standardized_name,
+            product.get("product_url"),
             normalized_unit,
             normalized_quantity,
-            price,
-            currency,
-            observed_at
+            product.get("shown_price_tl"),
+            CURRENCY,
+        ),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Per-product insert (kendi transaction'ı var)
+# ---------------------------------------------------------------------------
+def process_product(
+    conn,
+    run_id: int,
+    product: dict[str, Any],
+    category_slug: str,
+) -> bool:
+    """
+    Tek bir ürünü raw → stg → fact olarak yazar.
+    Başarılı → True, hatalı → False (ve hata loglanır).
+
+    Her ürün kendi küçük transaction'ında commit edilir.
+    Böylece 500. üründe hata olursa önceki 499 kaybolmaz.
+    """
+    cursor = conn.cursor()
+    try:
+        event_id = insert_raw_event(cursor, run_id, product, category_slug)
+        observation_id = insert_stg_observation(cursor, event_id, run_id, product)
+        insert_fact_observation(cursor, observation_id, run_id, product)
+        conn.commit()
+        return True
+    except Exception as e:
+        conn.rollback()
+        logger.warning(
+            "Product skipped — name=%r  error=%s",
+            product.get("product_name"),
+            str(e)[:300],
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-    """, (
-        observation_id,
-        run_id,
-        SOURCE_NAME,
-        str(product.get("product_id")) if product.get("product_id") is not None else None,
-        product.get("sku"),
-        product.get("product_name"),
-        standardized_name,
-        product.get("product_url"),
-        normalized_unit,
-        normalized_quantity,
-        product.get("shown_price_tl"),
-        CURRENCY,
-    ))
+        return False
+    finally:
+        cursor.close()
 
 
+# ---------------------------------------------------------------------------
+# Main pipeline
+# ---------------------------------------------------------------------------
 def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
     conn = None
-    cursor = None
     run_id = None
 
     try:
         conn = get_connection()
-        cursor = conn.cursor()
 
-        run_id = start_run(cursor)
-        conn.commit()
+        # run_id'yi ayrı bir cursor + commit ile aç
+        with conn.cursor() as cur:
+            run_id = start_run(cur, category_slug)
+            conn.commit()
 
+        # Scrape
         scraped_products = get_migros_category_products(category_slug)
+        logger.info("Scraped %d products from category=%s", len(scraped_products), category_slug)
 
-        raw_count = 0
-        stg_count = 0
-        fact_count = 0
+        # Her ürünü tek tek işle — kısmi başarı mümkün
+        success_count = 0
+        failed_products: list[dict] = []
 
         for product in scraped_products:
-            event_id = insert_raw_event(
-                cursor=cursor,
-                run_id=run_id,
-                product=product,
-                category_slug=category_slug
-            )
-            raw_count += 1
+            ok = process_product(conn, run_id, product, category_slug)
+            if ok:
+                success_count += 1
+            else:
+                failed_products.append(product)
 
-            observation_id = insert_stg_observation(
-                cursor=cursor,
-                event_id=event_id,
-                run_id=run_id,
-                product=product
-            )
-            stg_count += 1
+        # Run'ı kapat
+        with conn.cursor() as cur:
+            finish_run(cur, run_id, success_count)
+            conn.commit()
 
-            insert_fact_observation(
-                cursor=cursor,
-                observation_id=observation_id,
-                run_id=run_id,
-                product=product
-            )
-            fact_count += 1
+        # Özet
+        logger.info("=" * 50)
+        logger.info("Run ID       : %s", run_id)
+        logger.info("Category     : %s", category_slug)
+        logger.info("Success      : %d", success_count)
+        logger.info("Failed       : %d", len(failed_products))
 
-        finish_run(cursor, run_id, raw_count)
-        conn.commit()
+        if failed_products:
+            logger.warning("Failed products:")
+            for p in failed_products:
+                logger.warning("  - %s", p.get("product_name"))
 
-        print("Pipeline finished successfully.")
-        print(f"Run ID: {run_id}")
-        print(f"Category: {category_slug}")
-        print(f"Raw rows inserted: {raw_count}")
-        print(f"Staging rows inserted: {stg_count}")
-        print(f"Fact rows inserted: {fact_count}")
+        # Eğer hiç başarılı kayıt yoksa pipeline'ı başarısız say
+        if success_count == 0 and scraped_products:
+            raise RuntimeError("All products failed to insert — check logs above.")
 
     except Exception as e:
         if conn is not None:
             conn.rollback()
 
-        if run_id is not None and cursor is not None:
+        if run_id is not None:
             try:
-                fail_run(cursor, run_id, str(e))
-                conn.commit()
+                with conn.cursor() as cur:
+                    fail_run(cur, run_id, str(e))
+                    conn.commit()
             except Exception:
-                if conn is not None:
-                    conn.rollback()
+                conn.rollback()
 
-        print(f"Pipeline failed: {e}")
-        raise  # 🔥 BU ÇOK KRİTİK
+        logger.exception("Pipeline failed: %s", e)
+        raise  # GitHub Actions bu exception'ı yakalar → workflow kırmızı olur
 
     finally:
-        if cursor is not None:
-            cursor.close()
         if conn is not None:
             conn.close()
+
+
 if __name__ == "__main__":
     run_pipeline(DEFAULT_CATEGORY_SLUG)
