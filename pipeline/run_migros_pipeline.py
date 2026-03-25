@@ -60,7 +60,7 @@ def finish_run(cursor, run_id: int, records: int):
         """
         UPDATE scrape_runs
         SET finished_at = NOW(),
-            status      = 'success',
+            status = 'success',
             records_scraped = %s
         WHERE run_id = %s
         """,
@@ -73,8 +73,8 @@ def fail_run(cursor, run_id: int, error_message: str):
     cursor.execute(
         """
         UPDATE scrape_runs
-        SET finished_at   = NOW(),
-            status        = 'failed',
+        SET finished_at = NOW(),
+            status = 'failed',
             error_message = %s
         WHERE run_id = %s
         """,
@@ -93,10 +93,10 @@ def normalize_unit(
     Kaynak birimi ve miktarı analiz için standartlaştırır.
 
     Örnekler:
-        GRAM + 1000  →  ("kg", 1.0)
-        GRAM + 400   →  ("g",  400.0)
-        PIECE + 6    →  ("piece", 6.0)
-        None + any   →  (None, None)
+        GRAM + 1000  → ("kg", 1.0)
+        GRAM + 400   → ("g", 400.0)
+        PIECE + 6    → ("piece", 6.0)
+        None + any   → (None, None)
     """
     if unit is None:
         return None, None
@@ -109,7 +109,9 @@ def normalize_unit(
             qty = float(quantity)
         except (TypeError, ValueError):
             logger.warning(
-                "normalize_unit: could not parse quantity=%r for unit=%s", quantity, unit
+                "normalize_unit: could not parse quantity=%r for unit=%s",
+                quantity,
+                unit,
             )
 
     if unit_upper == "GRAM":
@@ -130,7 +132,7 @@ def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
     Ürün adını karşılaştırma ve gruplama için sadeleştirir.
 
     Strateji: sayıyı çıkardıktan sonra birim kelimesini sil —
-    böylece "\bg\b" "göçmen" gibi kelimelerdeki harfleri etkilemez.
+    böylece "\\bg\\b" "göçmen" gibi kelimelerdeki harfleri etkilemez.
     """
     if not product_name:
         return None
@@ -143,7 +145,6 @@ def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
         name = name.replace(old, new)
 
     # "200g", "1kg", "500 gram" gibi sayı+birim bloklarını sil
-    # Önce sayılı birim ifadesini kaldır — tek başına "g" harfini değil
     name = re.sub(r"\b\d+\s*(?:kg|g|gram|ml|l|lt|adet|demet|paket)\b", " ", name)
 
     # Sayı olmadan kalan serbest birim kelimelerini de temizle
@@ -154,6 +155,36 @@ def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
     name = re.sub(r"\s+", " ", name).strip()
 
     return name or None
+
+
+# ---------------------------------------------------------------------------
+# Data quality helpers
+# ---------------------------------------------------------------------------
+def detect_suspicious(
+    product_name: Optional[str], price: Optional[float]
+) -> Tuple[bool, Optional[str]]:
+    name = (product_name or "").lower()
+
+    if price is None:
+        return True, "price_null"
+
+    if price <= 0:
+        return True, "price_invalid"
+
+    if price > 500:
+        return True, "price_too_high"
+
+    has_small_package_hint = (
+        " gr" in name
+        or "g paket" in name
+        or " g paket" in name
+        or "paket" in name
+    )
+
+    if has_small_package_hint and price > 200:
+        return True, "small_package_price_too_high"
+
+    return False, None
 
 
 # ---------------------------------------------------------------------------
@@ -193,14 +224,23 @@ def insert_stg_observation(
     )
     standardized_name = standardize_product_name(product.get("product_name"))
 
+    price = product.get("shown_price_tl")
+
+    is_suspicious, suspicious_reason = detect_suspicious(
+        product.get("product_name"),
+        price,
+    )
+
     cursor.execute(
         """
         INSERT INTO stg_price_observations
             (event_id, run_id, source_name, source_product_id, source_sku,
              product_name, product_url, price, currency,
              normalized_unit, normalized_quantity,
-             standardized_product_name, observed_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+             standardized_product_name,
+             is_suspicious, suspicious_reason,
+             observed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         RETURNING observation_id
         """,
         (
@@ -211,11 +251,13 @@ def insert_stg_observation(
             product.get("sku"),
             product.get("product_name"),
             product.get("product_url"),
-            product.get("shown_price_tl"),
+            price,
             CURRENCY,
             normalized_unit,
             normalized_quantity,
             standardized_name,
+            is_suspicious,
+            suspicious_reason,
         ),
     )
     return cursor.fetchone()[0]
@@ -224,6 +266,21 @@ def insert_stg_observation(
 def insert_fact_observation(
     cursor, observation_id: int, run_id: int, product: dict[str, Any]
 ):
+    price = product.get("shown_price_tl")
+
+    is_suspicious, _ = detect_suspicious(
+        product.get("product_name"),
+        price,
+    )
+
+    if is_suspicious:
+        logger.info(
+            "Skipping suspicious record for fact table — product=%r price=%r",
+            product.get("product_name"),
+            price,
+        )
+        return
+
     normalized_unit, normalized_quantity = normalize_unit(
         product.get("unit"), product.get("unit_amount")
     )
@@ -249,7 +306,7 @@ def insert_fact_observation(
             product.get("product_url"),
             normalized_unit,
             normalized_quantity,
-            product.get("shown_price_tl"),
+            price,
             CURRENCY,
         ),
     )
@@ -307,7 +364,11 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
 
         # Scrape
         scraped_products = get_migros_category_products(category_slug)
-        logger.info("Scraped %d products from category=%s", len(scraped_products), category_slug)
+        logger.info(
+            "Scraped %d products from category=%s",
+            len(scraped_products),
+            category_slug,
+        )
 
         # Her ürünü tek tek işle — kısmi başarı mümkün
         success_count = 0
