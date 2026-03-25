@@ -18,13 +18,13 @@ Source Websites (Migros / Carrefour / A101)
 Raw Price Event Capture
         │
         ▼
-Standardized Staging Observations
+Staging Layer (Normalization + Data Quality Checks)
         │
         ▼
 Canonical Product Mapping
         │
         ▼
-Fact Price Observations
+Fact Layer (Trusted Observations)
         │
         ▼
 Serving Layer (Analysis / Dashboard / Forecasting)
@@ -32,30 +32,82 @@ Serving Layer (Analysis / Dashboard / Forecasting)
 
 ---
 
-# Design Principles
+## Data Pipeline Layers
 
-The system follows modern data engineering design patterns:
+The pipeline is organized into three main layers:
+
+### 1. Raw Layer — `raw_price_events`
+- Stores raw scraped product data
+- No transformation applied
+- Used for debugging and traceability
+
+### 2. Staging Layer — `stg_price_observations`
+- Normalizes product structure
+- Standardizes product names and units
+- Applies data quality validation rules
+- Adds quality flags:
+  - `is_suspicious`
+  - `suspicious_reason`
+
+### 3. Fact Layer — `fact_price_observations`
+- Stores trusted, analytics-ready data
+- Only clean records are inserted
+- Suspicious records are excluded
+
+---
+
+## Data Quality System
+
+The pipeline includes a built-in data quality layer to ensure reliability.
+
+### Rule-based validation
+
+The system detects:
+
+- Null or missing prices
+- Invalid prices (≤ 0)
+- Extremely high prices
+- Inconsistent package-price relationships
+
+### Suspicious record handling
+
+Suspicious records:
+
+- Are stored in staging layer
+- Are marked with:
+  - `is_suspicious = true`
+  - `suspicious_reason`
+- Are excluded from fact layer
+
+This ensures that downstream analysis uses only reliable data.
+
+---
+
+## Design Principles
+
+The system follows modern data engineering best practices:
 
 - Raw data is always retained
 - Data transformations are layered
 - Pipeline runs are traceable
 - Observations are append-only
 - Analytical datasets are reproducible
-- Product identities are canonicalized across sources
+- Data quality validation is enforced
+- Clean and trusted data is separated from raw data
 
 ---
 
-# Data Flow
+## Data Flow
 
-The data pipeline follows a layered structure:
-
-1. Scrapers extract raw product data from supermarket websites.
-2. Raw events are stored in the database without modification.
-3. Parsing and normalization produce standardized observations.
-4. Canonical product identities are mapped across sources.
-5. Analytical fact tables are built for price analysis and forecasting.
+1. Scrapers extract product data from supermarket websites
+2. Raw events are stored without modification
+3. Data is normalized in staging layer
+4. Data quality checks are applied
+5. Clean data is written to fact tables
+6. Analytical and forecasting layers consume fact data
 
 ---
+
 
 # Tech Stack
 
@@ -73,24 +125,20 @@ The data pipeline follows a layered structure:
 food-price-intelligence
 │
 ├── scraper
-│ ├── migros
-│ │ ├── extract.py
-│ │ ├── parse.py
-│ │ └── selectors.py
+│ └── migros
+│ ├── extract.py
+│ ├── parse.py
+│ └── selectors.py
 │
 ├── pipeline
-│ ├── run_migros_pipeline.py
-│ ├── load_raw.py
-│ ├── build_staging.py
-│ ├── build_fact.py
-│ └── quality_checks.py
+│ └── run_migros_pipeline.py
 │
 ├── database
-│ ├── migrations
-│ │ ├── 001_create_scrape_runs.sql
-│ │ ├── 002_create_raw_price_events.sql
-│ │ ├── 003_create_stg_price_observations.sql
-│ │ └── 004_create_fact_price_observations.sql
+│ └── migrations
+│ ├── 001_create_scrape_runs.sql
+│ ├── 002_create_raw_price_events.sql
+│ ├── 003_create_stg_price_observations.sql
+│ └── 004_create_fact_price_observations.sql
 │
 ├── analysis
 │ └── price_analysis.py
@@ -98,172 +146,90 @@ food-price-intelligence
 ├── dashboard
 │ └── streamlit_app.py
 │
-├── docs
-│ └── architecture.md
-│
 └── README.md
 
 ---
 
-# Example Analysis
-
-Planned analyses include:
-
-- Market price comparison
-- Cheapest market detection
-- Product price trends
-- Food price inflation index
-
-Example question:
-
-> Which supermarket consistently offers the cheapest rice prices?
-
-The project will analyze historical price observations to answer these questions.
-
----
-
-# Current Features
+## Current Features
 
 - Scrapes food prices from Migros
-- Stores product and price observations in PostgreSQL
-- Supports historical price tracking
-- Forecast-ready database schema
+- Stores data in PostgreSQL (Neon)
+- Tracks historical price observations
+- Implements layered data pipeline
+- Includes data quality validation system
+- Separates raw, staging, and fact layers
+- Filters suspicious data before analysis
 
 ---
 
-# Planned Improvements
+## Planned Improvements
 
 - Add Carrefour and A101 scraping
-- Normalize product names and package sizes
+- Implement statistical anomaly detection (p95-based)
+- Normalize package sizes and compute price per unit
 - Build forecasting models
-- Create a Streamlit dashboard
-- Automate daily scraping with GitHub Actions
+- Create Streamlit dashboard
+- Automate daily scraping via GitHub Actions
 
 ---
 
-# Project Roadmap
+## Project Roadmap
 
-## Phase 1 — Data Collection
-
+### Phase 1 — Data Collection
 Scrape food prices from major supermarkets.
 
-Markets:
-- Migros
-- CarrefourSA
-- A101
+### Phase 2 — Data Storage
+Build structured and historical price datasets.
 
-Tracked products:
-- Rice
-- Milk
-- Eggs
-- Bread
-- Chicken
+### Phase 3 — Data Quality
+Introduce validation and anomaly detection.
 
-Goal: collect daily price observations for essential food products.
+### Phase 4 — Data Analysis
+Analyze price trends and market differences.
 
----
+### Phase 5 — Forecasting
+Build time series prediction models.
 
-## Phase 2 — Data Storage
-
-Store and organize price observations in a cloud PostgreSQL database.
-
-Tasks:
-
-- Store price observations
-- Build historical price dataset
-- Normalize product names and units
-- Handle duplicate products across markets
+### Phase 6 — Dashboard
+Visualize insights via Streamlit.
 
 ---
 
-## Phase 3 — Data Analysis
+## Why This Project Matters
 
-Analyze food price trends and market differences.
+This project demonstrates:
 
-Planned analyses:
-
-- Market price comparison
-- Cheapest market detection
-- Product price trends
-- Food price inflation index
-
-Example analysis questions:
-
-- Which supermarket offers the cheapest prices?
-- How do food prices change over time?
-- Which products show the highest price volatility?
-
----
-
-## Phase 4 — Forecasting
-
-Build time series forecasting models.
-
-Planned models:
-
-- Prophet
-- ARIMA (optional)
-
-Goals:
-
-- Predict food prices for the next 14 days
-- Identify potential price spikes
-- Detect price anomalies
-
----
-
-## Phase 5 — Dashboard
-
-Build an interactive dashboard using Streamlit.
-
-Dashboard features:
-
-- Price trend visualization
-- Market comparison charts
-- Forecast visualization
-- Food inflation index tracking
-
----
-
-# Why This Project Matters
-
-This project demonstrates key data engineering and data science skills:
-
-- Web scraping
-- Data pipeline design
+- End-to-end data pipeline design
+- Data quality engineering
 - Cloud database usage
-- Time series analysis
-- Forecasting
-- Dashboard development
+- Time series readiness
+- Analytical data modeling
 
 ---
 
-# Future Vision
+## Future Vision
 
-The long-term goal is to evolve the system into a **Food Price Intelligence Platform** capable of:
+The long-term goal is to build a **Food Price Intelligence Platform** capable of:
 
-- Automatically tracking supermarket prices
-- Building a historical food price dataset
+- Tracking supermarket prices automatically
 - Detecting abnormal price changes
 - Estimating food inflation trends
-- Supporting economic and consumer price analysis
+- Supporting economic analysis
 
 ---
 
-# Development Status
+## Development Status
 
 Current progress:
 
 - Migros scraping implemented
 - PostgreSQL cloud database connected
-- Historical price observation storage available
-- Layered data pipeline architecture in progress
-- Run-level pipeline tracking being added
+- Layered pipeline architecture established
+- Data quality validation implemented
+- Suspicious data filtering active
 
-Planned next steps:
+Next steps:
 
-- Implement run-level pipeline metadata
-- Introduce raw price event capture
-- Build staging layer for standardized observations
-- Implement canonical product mapping
-- Build analytical fact tables
+- Statistical anomaly detection (p95)
+- Unit normalization (price per kg / liter)
+- Dashboard development
