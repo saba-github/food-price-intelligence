@@ -242,7 +242,6 @@ def insert_stg_observation(
     price_per_unit = calculate_price_per_unit(price, normalized_quantity)
     standardized_name = standardize_product_name(product.get("product_name"))
 
-    price = product.get("shown_price_tl")
     regular_price = product.get("regular_price_tl")
     discount_rate = product.get("discount_rate")
     brand_name = product.get("brand_name")
@@ -254,35 +253,40 @@ def insert_stg_observation(
     )
 
     cursor.execute(
-    """
-    INSERT INTO fact_price_observations
-        (observation_id, run_id, source_name, source_product_id, source_sku,
-         product_name, standardized_product_name, product_url,
-         normalized_unit, normalized_quantity, price_per_unit,
-         price, currency, observed_at,
-         regular_price, discount_rate, brand_name, category_name)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
-    """,
-    (
-        observation_id,
-        run_id,
-        SOURCE_NAME,
-        str(product["product_id"]) if product.get("product_id") is not None else None,
-        product.get("sku"),
-        product.get("product_name"),
-        standardized_name,
-        product.get("product_url"),
-        normalized_unit,
-        normalized_quantity,
-        price_per_unit,
-        price,
-        CURRENCY,
-        regular_price,
-        discount_rate,
-        brand_name,
-        category_name,
-    ),
-),
+        """
+        INSERT INTO stg_price_observations
+            (event_id, run_id, source_name, source_product_id, source_sku,
+             product_name, product_url, price, currency,
+             normalized_unit, normalized_quantity, price_per_unit,
+             standardized_product_name,
+             regular_price, discount_rate, brand_name, category_name,
+             is_suspicious, suspicious_reason,
+             observed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        RETURNING observation_id
+        """,
+        (
+            event_id,
+            run_id,
+            SOURCE_NAME,
+            str(product["product_id"]) if product.get("product_id") is not None else None,
+            product.get("sku"),
+            product.get("product_name"),
+            product.get("product_url"),
+            price,
+            CURRENCY,
+            normalized_unit,
+            normalized_quantity,
+            price_per_unit,
+            standardized_name,
+            regular_price,
+            discount_rate,
+            brand_name,
+            category_name,
+            is_suspicious,
+            suspicious_reason,
+        ),
+    )
     return cursor.fetchone()[0]
 
 
@@ -345,7 +349,6 @@ def insert_fact_observation(
             category_name,
         ),
     )
-
 
 # ---------------------------------------------------------------------------
 # Per-product insert (kendi transaction'ı var)
