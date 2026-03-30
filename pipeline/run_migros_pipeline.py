@@ -372,10 +372,9 @@ def process_product(
         return True
     except Exception as e:
         conn.rollback()
-        logger.warning(
-            "Product skipped — name=%r  error=%s",
+        logger.exception(
+            "Product skipped — name=%r",
             product.get("product_name"),
-            str(e)[:300],
         )
         return False
     finally:
