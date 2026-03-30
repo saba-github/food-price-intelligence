@@ -225,6 +225,10 @@ def insert_stg_observation(
     standardized_name = standardize_product_name(product.get("product_name"))
 
     price = product.get("shown_price_tl")
+    regular_price = product.get("regular_price_tl")
+    discount_rate = product.get("discount_rate")
+    brand_name = product.get("brand_name")
+    category_name = product.get("category_name")
 
     is_suspicious, suspicious_reason = detect_suspicious(
         product.get("product_name"),
@@ -238,9 +242,10 @@ def insert_stg_observation(
              product_name, product_url, price, currency,
              normalized_unit, normalized_quantity,
              standardized_product_name,
+             regular_price, discount_rate, brand_name, category_name,
              is_suspicious, suspicious_reason,
              observed_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         RETURNING observation_id
         """,
         (
@@ -256,6 +261,10 @@ def insert_stg_observation(
             normalized_unit,
             normalized_quantity,
             standardized_name,
+            regular_price,
+            discount_rate,
+            brand_name,
+            category_name,
             is_suspicious,
             suspicious_reason,
         ),
@@ -286,14 +295,20 @@ def insert_fact_observation(
     )
     standardized_name = standardize_product_name(product.get("product_name"))
 
+    regular_price = product.get("regular_price_tl")
+    discount_rate = product.get("discount_rate")
+    brand_name = product.get("brand_name")
+    category_name = product.get("category_name")
+
     cursor.execute(
         """
         INSERT INTO fact_price_observations
             (observation_id, run_id, source_name, source_product_id, source_sku,
              product_name, standardized_product_name, product_url,
              normalized_unit, normalized_quantity,
-             price, currency, observed_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+             price, currency, observed_at,
+             regular_price, discount_rate, brand_name, category_name)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
         """,
         (
             observation_id,
@@ -308,6 +323,10 @@ def insert_fact_observation(
             normalized_quantity,
             price,
             CURRENCY,
+            regular_price,
+            discount_rate,
+            brand_name,
+            category_name,
         ),
     )
 
