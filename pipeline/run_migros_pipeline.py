@@ -238,6 +238,8 @@ def insert_stg_observation(
     normalized_unit, normalized_quantity = normalize_unit(
         product.get("unit"), product.get("unit_amount")
     )
+    price = product.get("shown_price_tl")
+    price_per_unit = calculate_price_per_unit(price, normalized_quantity)
     standardized_name = standardize_product_name(product.get("product_name"))
 
     price = product.get("shown_price_tl")
