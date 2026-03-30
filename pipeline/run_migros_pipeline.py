@@ -156,7 +156,23 @@ def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
 
     return name or None
 
+def calculate_price_per_unit(
+    price: Optional[float], normalized_quantity: Optional[float]
+) -> Optional[float]:
+    if price is None or normalized_quantity is None:
+        return None
 
+    try:
+        price_value = float(price)
+        quantity_value = float(normalized_quantity)
+    except (TypeError, ValueError):
+        return None
+
+    if quantity_value <= 0:
+        return None
+
+    return round(price_value / quantity_value, 4)
+    
 # ---------------------------------------------------------------------------
 # Data quality helpers
 # ---------------------------------------------------------------------------
