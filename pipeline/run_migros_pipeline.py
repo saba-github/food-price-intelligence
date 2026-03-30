@@ -307,6 +307,7 @@ def insert_fact_observation(
     normalized_unit, normalized_quantity = normalize_unit(
         product.get("unit"), product.get("unit_amount")
     )
+    price_per_unit = calculate_price_per_unit(price, normalized_quantity)
     standardized_name = standardize_product_name(product.get("product_name"))
 
     regular_price = product.get("regular_price_tl")
@@ -319,10 +320,10 @@ def insert_fact_observation(
         INSERT INTO fact_price_observations
             (observation_id, run_id, source_name, source_product_id, source_sku,
              product_name, standardized_product_name, product_url,
-             normalized_unit, normalized_quantity,
+             normalized_unit, normalized_quantity, price_per_unit,
              price, currency, observed_at,
              regular_price, discount_rate, brand_name, category_name)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
         """,
         (
             observation_id,
@@ -335,6 +336,7 @@ def insert_fact_observation(
             product.get("product_url"),
             normalized_unit,
             normalized_quantity,
+            price_per_unit,
             price,
             CURRENCY,
             regular_price,
