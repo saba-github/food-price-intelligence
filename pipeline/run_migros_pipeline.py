@@ -172,7 +172,12 @@ def calculate_price_per_unit(
         return None
 
     return round(price_value / quantity_value, 4)
-    
+
+
+def build_unit_price_label(normalized_unit: Optional[str]) -> Optional[str]:
+    if normalized_unit is None:
+        return None
+    return f"TRY/{normalized_unit}"
 # ---------------------------------------------------------------------------
 # Data quality helpers
 # ---------------------------------------------------------------------------
