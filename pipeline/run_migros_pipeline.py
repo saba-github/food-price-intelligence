@@ -268,7 +268,7 @@ def insert_stg_observation(
          regular_price, discount_rate, brand_name, category_name,
          is_suspicious, suspicious_reason,
          observed_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
     RETURNING observation_id
     """,
     (
