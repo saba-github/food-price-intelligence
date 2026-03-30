@@ -283,7 +283,7 @@ def insert_stg_observation(
         category_name,
     ),
 ),
-      return cursor.fetchone()[0]
+    return cursor.fetchone()[0]
 
 
 def insert_fact_observation(
