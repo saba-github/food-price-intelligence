@@ -92,34 +92,6 @@ def normalize_unit(
     """
     Kaynak birimi ve miktarı analiz için standartlaştırır.
 
-    Örnekler:
-        GRAM + 1000  → ("kg", 1.0)
-        GRAM + 400   → ("g", 400.0)
-        PIECE + 6    → ("piece", 6.0)
-        None + any   → (None, None)
-    """
-    if unit is None:
-        return None, None
-
-    unit_upper = str(unit).strip().upper()
-
-    qty: Optional[float] = None
-    if quantity is not None:
-        try:
-            qty = float(quantity)
-        except (TypeError, ValueError):
-            logger.warning(
-                "normalize_unit: could not parse quantity=%r for unit=%s",
-                quantity,
-                unit,
-            )
-
-    def normalize_unit(
-    unit: Optional[str], quantity: Any
-) -> Tuple[Optional[str], Optional[float]]:
-    """
-    Kaynak birimi ve miktarı analiz için standartlaştırır.
-
     Kural:
     - GRAM -> her zaman kg bazına çevrilir
     - PIECE -> piece olarak kalır
@@ -151,13 +123,6 @@ def normalize_unit(
         return "piece", qty if qty is not None else 1.0
 
     return unit.lower(), qty
-
-    if unit_upper == "PIECE":
-        return "piece", qty if qty is not None else 1.0
-
-    # Fallback — unknown unit, keep as-is but lowercase
-    return unit.lower(), qty
-
 
 def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
     """
