@@ -114,11 +114,43 @@ def normalize_unit(
                 unit,
             )
 
+    def normalize_unit(
+    unit: Optional[str], quantity: Any
+) -> Tuple[Optional[str], Optional[float]]:
+    """
+    Kaynak birimi ve miktarı analiz için standartlaştırır.
+
+    Kural:
+    - GRAM -> her zaman kg bazına çevrilir
+    - PIECE -> piece olarak kalır
+    - Bilinmeyen birimler lowercase olarak korunur
+    """
+    if unit is None:
+        return None, None
+
+    unit_upper = str(unit).strip().upper()
+
+    qty: Optional[float] = None
+    if quantity is not None:
+        try:
+            qty = float(quantity)
+        except (TypeError, ValueError):
+            logger.warning(
+                "normalize_unit: could not parse quantity=%r for unit=%s",
+                quantity,
+                unit,
+            )
+
     if unit_upper == "GRAM":
         if qty is None:
             logger.warning("normalize_unit: GRAM unit but quantity is None")
-            return "g", None
-        return ("kg", 1.0) if qty == 1000 else ("g", qty)
+            return "kg", None
+        return "kg", round(qty / 1000, 4)
+
+    if unit_upper == "PIECE":
+        return "piece", qty if qty is not None else 1.0
+
+    return unit.lower(), qty
 
     if unit_upper == "PIECE":
         return "piece", qty if qty is not None else 1.0
