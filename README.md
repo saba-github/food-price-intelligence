@@ -101,6 +101,20 @@ The pipeline is fully automated:
 * Data is stored as **append-only observations**
 
 ---
+##  Data Quality Metrics
+
+Latest pipeline run quality:
+
+- Raw records: 30
+- Staging records: 30
+- Fact records: 30
+- Data loss: 0%
+- Null values: 0%
+- Suspicious records: 0%
+
+This ensures that the pipeline produces fully consistent and analytics-ready datasets.
+
+-----
 
 #  Example Output
 
@@ -150,20 +164,7 @@ food-price-intelligence
 
 ---
 
-## 📊 Data Quality Metrics
 
-Latest pipeline run quality:
-
-- Raw records: 30
-- Staging records: 30
-- Fact records: 30
-- Data loss: 0%
-- Null values: 0%
-- Suspicious records: 0%
-
-This ensures that the pipeline produces fully consistent and analytics-ready datasets.
-
------
 
 #  Current Status
 
