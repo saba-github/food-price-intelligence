@@ -175,6 +175,51 @@ def build_unit_price_label(normalized_unit: Optional[str]) -> Optional[str]:
     if normalized_unit is None:
         return None
     return f"TRY/{normalized_unit}"
+
+def transform_product(product: dict) -> dict:
+    price = product.get("shown_price_tl")
+    regular_price = product.get("regular_price_tl")
+    currency = product.get("currency")
+
+    unit = product.get("unit")
+    unit_amount = product.get("unit_amount")
+
+    normalized_unit, normalized_quantity = normalize_unit(unit, unit_amount)
+
+    price_per_unit = calculate_price_per_unit(price, normalized_quantity)
+    unit_price_label = build_unit_price_label(normalized_unit)
+
+    standardized_product_name = standardize_product_name(product.get("product_name"))
+
+    is_suspicious, suspicious_reason = detect_suspicious(
+        product.get("product_name"),
+        price,
+    )
+
+    discount_rate = None
+    if regular_price and price:
+        try:
+            discount_rate = round((regular_price - price) / regular_price, 4)
+        except:
+            discount_rate = None
+
+    return {
+        "price": price,
+        "regular_price": regular_price,
+        "currency": currency,
+        "normalized_unit": normalized_unit,
+        "normalized_quantity": normalized_quantity,
+        "price_per_unit": price_per_unit,
+        "unit_price_label": unit_price_label,
+        "standardized_product_name": standardized_product_name,
+        "is_suspicious": is_suspicious,
+        "suspicious_reason": suspicious_reason,
+        "brand_name": product.get("brand_name"),
+        "category_name": product.get("category_name"),
+        "discount_rate": discount_rate,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Data quality helpers
 # ---------------------------------------------------------------------------
