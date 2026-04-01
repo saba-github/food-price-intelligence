@@ -475,11 +475,55 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             else:
                 failed_products.append(product)
 
-        # Run'ı kapat
-        with conn.cursor() as cur:
-            finish_run(cur, run_id, success_count)
-            conn.commit()
+        # ---------------------------
+# DATA QUALITY CHECKS
+# ---------------------------
+with conn.cursor() as cur:
+    cur.execute(
+        """
+        select count(*)::int,
+               count(price_per_unit)::int,
+               count(category_name)::int
+        from fact_price_observations
+        where run_id = %s
+        """,
+        (run_id,),
+    )
+    total_rows, non_null_price_per_unit_rows, non_null_category_rows = cur.fetchone()
 
+    price_check_status = "pass" if total_rows == non_null_price_per_unit_rows else "fail"
+    category_check_status = "pass" if total_rows == non_null_category_rows else "fail"
+
+    log_quality_check(
+        cur,
+        run_id,
+        "fact_price_per_unit_completeness",
+        price_check_status,
+        non_null_price_per_unit_rows,
+        total_rows,
+        "price_per_unit should be populated for all fact rows in the run",
+    )
+
+    log_quality_check(
+        cur,
+        run_id,
+        "fact_category_name_completeness",
+        category_check_status,
+        non_null_category_rows,
+        total_rows,
+        "category_name should be populated for all fact rows in the run",
+    )
+
+    conn.commit()
+
+    if price_check_status == "fail" or category_check_status == "fail":
+        raise RuntimeError("Data quality checks failed for current run.")
+
+
+# Run'ı kapat
+with conn.cursor() as cur:
+    finish_run(cur, run_id, success_count)
+    conn.commit()
         # Özet
         logger.info("=" * 50)
         logger.info("Run ID       : %s", run_id)
