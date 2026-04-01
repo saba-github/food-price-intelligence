@@ -82,7 +82,23 @@ def fail_run(cursor, run_id: int, error_message: str):
     )
     logger.error("Run failed — run_id=%s  error=%s", run_id, error_message[:200])
 
-
+def log_quality_check(
+    cursor,
+    run_id: int,
+    check_name: str,
+    check_status: str,
+    observed_value: float | int | None = None,
+    threshold_value: float | int | None = None,
+    details: str | None = None,
+):
+    cursor.execute(
+        """
+        insert into ops_data_quality_results
+            (run_id, check_name, check_status, observed_value, threshold_value, details)
+        values (%s, %s, %s, %s, %s, %s)
+        """,
+        (run_id, check_name, check_status, observed_value, threshold_value, details),
+    )
 # ---------------------------------------------------------------------------
 # Normalization helpers
 # ---------------------------------------------------------------------------
