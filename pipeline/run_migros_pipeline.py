@@ -475,10 +475,11 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             else:
                 failed_products.append(product)
 
-        # ---------------------------
-# DATA QUALITY CHECKS
-# ---------------------------
 with conn.cursor() as cur:
+
+    # ---------------------------
+    # DATA QUALITY CHECKS
+    # ---------------------------
     cur.execute(
         """
         select count(*)::int,
@@ -489,6 +490,7 @@ with conn.cursor() as cur:
         """,
         (run_id,),
     )
+
     total_rows, non_null_price_per_unit_rows, non_null_category_rows = cur.fetchone()
 
     price_check_status = "pass" if total_rows == non_null_price_per_unit_rows else "fail"
@@ -514,15 +516,14 @@ with conn.cursor() as cur:
         "category_name should be populated for all fact rows in the run",
     )
 
-    conn.commit()
-
     if price_check_status == "fail" or category_check_status == "fail":
         raise RuntimeError("Data quality checks failed for current run.")
 
-
-# Run'ı kapat
-with conn.cursor() as cur:
+    # ---------------------------
+    # RUN FINISH
+    # ---------------------------
     finish_run(cur, run_id, success_count)
+
     conn.commit()
         # Özet
         logger.info("=" * 50)
