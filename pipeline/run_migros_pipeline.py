@@ -184,17 +184,20 @@ def transform_product(product: dict) -> dict:
     unit = product.get("unit")
     unit_amount = product.get("unit_amount")
 
-    normalized_unit, normalized_quantity = normalize_unit(unit, unit_amount)
+    normalized_unit = transformed["normalized_unit"]
+    normalized_quantity = transformed["normalized_quantity"]
+    price_per_unit = transformed["price_per_unit"]
+    unit_price_label = transformed["unit_price_label"]
+    standardized_name = transformed["standardized_product_name"]
+    is_suspicious = transformed["is_suspicious"]
+    suspicious_reason = transformed["suspicious_reason"]
 
-    price_per_unit = calculate_price_per_unit(price, normalized_quantity)
-    unit_price_label = build_unit_price_label(normalized_unit)
+    regular_price = transformed["regular_price"]
+    discount_rate = transformed["discount_rate"]
+    brand_name = transformed["brand_name"]
+    category_name = transformed["category_name"]
 
-    standardized_product_name = standardize_product_name(product.get("product_name"))
-
-    is_suspicious, suspicious_reason = detect_suspicious(
-        product.get("product_name"),
-        price,
-    )
+    price = transformed["price"]
 
     discount_rate = None
     if regular_price and price:
@@ -280,7 +283,7 @@ def insert_raw_event(
 
 
 def insert_stg_observation(
-    cursor, event_id: int, run_id: int, product: dict[str, Any]
+    cursor, event_id: int, run_id: int, product: dict[str, Any], transformed: dict
 ) -> int:
     normalized_unit, normalized_quantity = normalize_unit(
         product.get("unit"), product.get("unit_amount")
