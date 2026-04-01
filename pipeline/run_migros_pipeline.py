@@ -176,40 +176,31 @@ def build_unit_price_label(normalized_unit: Optional[str]) -> Optional[str]:
         return None
     return f"TRY/{normalized_unit}"
 
-def transform_product(product: dict) -> dict:
+def transform_product(product: dict[str, Any]) -> dict[str, Any]:
     price = product.get("shown_price_tl")
     regular_price = product.get("regular_price_tl")
-    currency = product.get("currency")
 
     unit = product.get("unit")
     unit_amount = product.get("unit_amount")
 
-    normalized_unit = transformed["normalized_unit"]
-    normalized_quantity = transformed["normalized_quantity"]
-    price_per_unit = transformed["price_per_unit"]
-    unit_price_label = transformed["unit_price_label"]
-    standardized_name = transformed["standardized_product_name"]
-    is_suspicious = transformed["is_suspicious"]
-    suspicious_reason = transformed["suspicious_reason"]
+    normalized_unit, normalized_quantity = normalize_unit(unit, unit_amount)
+    price_per_unit = calculate_price_per_unit(price, normalized_quantity)
+    unit_price_label = build_unit_price_label(normalized_unit)
+    standardized_product_name = standardize_product_name(product.get("product_name"))
 
-    regular_price = transformed["regular_price"]
-    discount_rate = transformed["discount_rate"]
-    brand_name = transformed["brand_name"]
-    category_name = transformed["category_name"]
+    is_suspicious, suspicious_reason = detect_suspicious(
+        product.get("product_name"),
+        price,
+    )
 
-    price = transformed["price"]
-
-    discount_rate = None
-    if regular_price and price:
-        try:
-            discount_rate = round((regular_price - price) / regular_price, 4)
-        except:
-            discount_rate = None
+    discount_rate = product.get("discount_rate")
+    brand_name = product.get("brand_name")
+    category_name = product.get("category_name")
 
     return {
         "price": price,
         "regular_price": regular_price,
-        "currency": currency,
+        "currency": CURRENCY,
         "normalized_unit": normalized_unit,
         "normalized_quantity": normalized_quantity,
         "price_per_unit": price_per_unit,
@@ -217,8 +208,8 @@ def transform_product(product: dict) -> dict:
         "standardized_product_name": standardized_product_name,
         "is_suspicious": is_suspicious,
         "suspicious_reason": suspicious_reason,
-        "brand_name": product.get("brand_name"),
-        "category_name": product.get("category_name"),
+        "brand_name": brand_name,
+        "category_name": category_name,
         "discount_rate": discount_rate,
     }
 
@@ -283,126 +274,113 @@ def insert_raw_event(
 
 
 def insert_stg_observation(
-    cursor, event_id: int, run_id: int, product: dict[str, Any], transformed: dict
+    cursor, event_id: int, run_id: int, product: dict[str, Any], transformed: dict[str, Any]
 ) -> int:
-    normalized_unit, normalized_quantity = normalize_unit(
-        product.get("unit"), product.get("unit_amount")
-    )
-    price = product.get("shown_price_tl")
-    price_per_unit = calculate_price_per_unit(price, normalized_quantity)
-    unit_price_label = build_unit_price_label(normalized_unit)
-    standardized_name = standardize_product_name(product.get("product_name"))
-
-    regular_price = product.get("regular_price_tl")
-    discount_rate = product.get("discount_rate")
-    brand_name = product.get("brand_name")
-    category_name = product.get("category_name")
-
-    is_suspicious, suspicious_reason = detect_suspicious(
-        product.get("product_name"),
-        price,
-    )
+    price = transformed["price"]
+    normalized_unit = transformed["normalized_unit"]
+    normalized_quantity = transformed["normalized_quantity"]
+    price_per_unit = transformed["price_per_unit"]
+    unit_price_label = transformed["unit_price_label"]
+    standardized_name = transformed["standardized_product_name"]
+    regular_price = transformed["regular_price"]
+    discount_rate = transformed["discount_rate"]
+    brand_name = transformed["brand_name"]
+    category_name = transformed["category_name"]
+    is_suspicious = transformed["is_suspicious"]
+    suspicious_reason = transformed["suspicious_reason"]
 
     cursor.execute(
-    """
-    INSERT INTO stg_price_observations
-        (event_id, run_id, source_name, source_product_id, source_sku,
-         product_name, product_url, price, currency,
-         normalized_unit, normalized_quantity, price_per_unit, unit_price_label,
-         standardized_product_name,
-         regular_price, discount_rate, brand_name, category_name,
-         is_suspicious, suspicious_reason,
-         observed_at)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
-    RETURNING observation_id
-    """,
-    (
-        event_id,
-        run_id,
-        SOURCE_NAME,
-        str(product["product_id"]) if product.get("product_id") is not None else None,
-        product.get("sku"),
-        product.get("product_name"),
-        product.get("product_url"),
-        price,
-        CURRENCY,
-        normalized_unit,
-        normalized_quantity,
-        price_per_unit,
-        unit_price_label,
-        standardized_name,
-        regular_price,
-        discount_rate,
-        brand_name,
-        category_name,
-        is_suspicious,
-        suspicious_reason,
-    ),
-)
+        """
+        INSERT INTO stg_price_observations
+            (event_id, run_id, source_name, source_product_id, source_sku,
+             product_name, product_url, price, currency,
+             normalized_unit, normalized_quantity, price_per_unit, unit_price_label,
+             standardized_product_name,
+             regular_price, discount_rate, brand_name, category_name,
+             is_suspicious, suspicious_reason,
+             observed_at)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        RETURNING observation_id
+        """,
+        (
+            event_id,
+            run_id,
+            SOURCE_NAME,
+            str(product["product_id"]) if product.get("product_id") is not None else None,
+            product.get("sku"),
+            product.get("product_name"),
+            product.get("product_url"),
+            price,
+            CURRENCY,
+            normalized_unit,
+            normalized_quantity,
+            price_per_unit,
+            unit_price_label,
+            standardized_name,
+            regular_price,
+            discount_rate,
+            brand_name,
+            category_name,
+            is_suspicious,
+            suspicious_reason,
+        ),
+    )
     return cursor.fetchone()[0]
 
 
 def insert_fact_observation(
-    cursor, observation_id: int, run_id: int, product: dict[str, Any]
+    cursor, observation_id: int, run_id: int, product: dict[str, Any], transformed: dict[str, Any]
 ):
-    price = product.get("shown_price_tl")
-
-    is_suspicious, _ = detect_suspicious(
-        product.get("product_name"),
-        price,
-    )
-
-    if is_suspicious:
+    if transformed["is_suspicious"]:
         logger.info(
             "Skipping suspicious record for fact table — product=%r price=%r",
             product.get("product_name"),
-            price,
+            transformed["price"],
         )
         return
 
-    normalized_unit, normalized_quantity = normalize_unit(
-        product.get("unit"), product.get("unit_amount")
-    )
-    price_per_unit = calculate_price_per_unit(price, normalized_quantity)
-    unit_price_label = build_unit_price_label(normalized_unit)
-    standardized_name = standardize_product_name(product.get("product_name"))
-
-    regular_price = product.get("regular_price_tl")
-    discount_rate = product.get("discount_rate")
-    brand_name = product.get("brand_name")
-    category_name = product.get("category_name")
+    price = transformed["price"]
+    normalized_unit = transformed["normalized_unit"]
+    normalized_quantity = transformed["normalized_quantity"]
+    price_per_unit = transformed["price_per_unit"]
+    unit_price_label = transformed["unit_price_label"]
+    standardized_name = transformed["standardized_product_name"]
+    regular_price = transformed["regular_price"]
+    discount_rate = transformed["discount_rate"]
+    brand_name = transformed["brand_name"]
+    category_name = transformed["category_name"]
 
     cursor.execute(
-    """
-    INSERT INTO fact_price_observations
-        (observation_id, run_id, source_name, source_product_id, source_sku,
-         product_name, standardized_product_name, product_url,
-         normalized_unit, normalized_quantity, price_per_unit, unit_price_label,
-         price, currency, observed_at,
-         regular_price, discount_rate, brand_name, category_name)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
-    """,
-    (
-        observation_id,
-        run_id,
-        SOURCE_NAME,
-        str(product["product_id"]) if product.get("product_id") is not None else None,
-        product.get("sku"),
-        product.get("product_name"),
-        standardized_name,
-        product.get("product_url"),
-        normalized_unit,
-        normalized_quantity,
-        price_per_unit,
-        unit_price_label,
-        price,
-        CURRENCY,
-        regular_price,
-        discount_rate,
-        brand_name,
-        category_name,
-    ),
-)
+        """
+        INSERT INTO fact_price_observations
+            (observation_id, run_id, source_name, source_product_id, source_sku,
+             product_name, standardized_product_name, product_url,
+             normalized_unit, normalized_quantity, price_per_unit, unit_price_label,
+             price, currency, observed_at,
+             regular_price, discount_rate, brand_name, category_name)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
+        """,
+        (
+            observation_id,
+            run_id,
+            SOURCE_NAME,
+            str(product["product_id"]) if product.get("product_id") is not None else None,
+            product.get("sku"),
+            product.get("product_name"),
+            standardized_name,
+            product.get("product_url"),
+            normalized_unit,
+            normalized_quantity,
+            price_per_unit,
+            unit_price_label,
+            price,
+            CURRENCY,
+            regular_price,
+            discount_rate,
+            brand_name,
+            category_name,
+        ),
+    )
 
 
 
