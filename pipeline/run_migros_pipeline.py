@@ -451,12 +451,10 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
     try:
         conn = get_connection()
 
-        # run_id'yi ayrı bir cursor + commit ile aç
         with conn.cursor() as cur:
             run_id = start_run(cur, category_slug)
             conn.commit()
 
-        # Scrape
         scraped_products = get_migros_category_products(category_slug)
         logger.info(
             "Scraped %d products from category=%s",
@@ -464,7 +462,6 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             category_slug,
         )
 
-                # Her ürünü tek tek işle — kısmi başarı mümkün
         success_count = 0
         failed_products: list[dict] = []
 
@@ -475,7 +472,6 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             else:
                 failed_products.append(product)
 
-        # Data quality checks + run finish
         with conn.cursor() as cur:
             cur.execute(
                 """
@@ -518,7 +514,6 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             finish_run(cur, run_id, success_count)
             conn.commit()
 
-        # Özet
         logger.info("=" * 50)
         logger.info("Run ID       : %s", run_id)
         logger.info("Category     : %s", category_slug)
@@ -530,6 +525,28 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             for p in failed_products:
                 logger.warning("  - %s", p.get("product_name"))
 
-        # Eğer hiç başarılı kayıt yoksa pipeline'ı başarısız say
         if success_count == 0 and scraped_products:
             raise RuntimeError("All products failed to insert — check logs above.")
+
+    except Exception as e:
+        if conn is not None:
+            conn.rollback()
+
+        if run_id is not None and conn is not None:
+            try:
+                with conn.cursor() as cur:
+                    fail_run(cur, run_id, str(e))
+                    conn.commit()
+            except Exception:
+                conn.rollback()
+
+        logger.exception("Pipeline failed: %s", e)
+        raise
+
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+if __name__ == "__main__":
+    run_pipeline(DEFAULT_CATEGORY_SLUG)
