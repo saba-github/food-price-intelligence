@@ -464,7 +464,7 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             category_slug,
         )
 
-        # Her ürünü tek tek işle — kısmi başarı mümkün
+                # Her ürünü tek tek işle — kısmi başarı mümkün
         success_count = 0
         failed_products: list[dict] = []
 
@@ -475,56 +475,49 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             else:
                 failed_products.append(product)
 
-with conn.cursor() as cur:
+        # Data quality checks + run finish
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                select count(*)::int,
+                       count(price_per_unit)::int,
+                       count(category_name)::int
+                from fact_price_observations
+                where run_id = %s
+                """,
+                (run_id,),
+            )
+            total_rows, non_null_price_per_unit_rows, non_null_category_rows = cur.fetchone()
 
-    # ---------------------------
-    # DATA QUALITY CHECKS
-    # ---------------------------
-    cur.execute(
-        """
-        select count(*)::int,
-               count(price_per_unit)::int,
-               count(category_name)::int
-        from fact_price_observations
-        where run_id = %s
-        """,
-        (run_id,),
-    )
+            price_check_status = "pass" if total_rows == non_null_price_per_unit_rows else "fail"
+            category_check_status = "pass" if total_rows == non_null_category_rows else "fail"
 
-    total_rows, non_null_price_per_unit_rows, non_null_category_rows = cur.fetchone()
+            log_quality_check(
+                cur,
+                run_id,
+                "fact_price_per_unit_completeness",
+                price_check_status,
+                non_null_price_per_unit_rows,
+                total_rows,
+                "price_per_unit should be populated for all fact rows in the run",
+            )
 
-    price_check_status = "pass" if total_rows == non_null_price_per_unit_rows else "fail"
-    category_check_status = "pass" if total_rows == non_null_category_rows else "fail"
+            log_quality_check(
+                cur,
+                run_id,
+                "fact_category_name_completeness",
+                category_check_status,
+                non_null_category_rows,
+                total_rows,
+                "category_name should be populated for all fact rows in the run",
+            )
 
-    log_quality_check(
-        cur,
-        run_id,
-        "fact_price_per_unit_completeness",
-        price_check_status,
-        non_null_price_per_unit_rows,
-        total_rows,
-        "price_per_unit should be populated for all fact rows in the run",
-    )
+            if price_check_status == "fail" or category_check_status == "fail":
+                raise RuntimeError("Data quality checks failed for current run.")
 
-    log_quality_check(
-        cur,
-        run_id,
-        "fact_category_name_completeness",
-        category_check_status,
-        non_null_category_rows,
-        total_rows,
-        "category_name should be populated for all fact rows in the run",
-    )
+            finish_run(cur, run_id, success_count)
+            conn.commit()
 
-    if price_check_status == "fail" or category_check_status == "fail":
-        raise RuntimeError("Data quality checks failed for current run.")
-
-    # ---------------------------
-    # RUN FINISH
-    # ---------------------------
-    finish_run(cur, run_id, success_count)
-
-    conn.commit()
         # Özet
         logger.info("=" * 50)
         logger.info("Run ID       : %s", run_id)
@@ -540,26 +533,3 @@ with conn.cursor() as cur:
         # Eğer hiç başarılı kayıt yoksa pipeline'ı başarısız say
         if success_count == 0 and scraped_products:
             raise RuntimeError("All products failed to insert — check logs above.")
-
-    except Exception as e:
-        if conn is not None:
-            conn.rollback()
-
-        if run_id is not None:
-            try:
-                with conn.cursor() as cur:
-                    fail_run(cur, run_id, str(e))
-                    conn.commit()
-            except Exception:
-                conn.rollback()
-
-        logger.exception("Pipeline failed: %s", e)
-        raise  # GitHub Actions bu exception'ı yakalar → workflow kırmızı olur
-
-    finally:
-        if conn is not None:
-            conn.close()
-
-
-if __name__ == "__main__":
-    run_pipeline(DEFAULT_CATEGORY_SLUG)
