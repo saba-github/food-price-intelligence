@@ -422,8 +422,15 @@ def process_product(
     cursor = conn.cursor()
     try:
         event_id = insert_raw_event(cursor, run_id, product, category_slug)
-        observation_id = insert_stg_observation(cursor, event_id, run_id, product)
-        insert_fact_observation(cursor, observation_id, run_id, product)
+        
+        transformed = transform_product(product)
+        
+        observation_id = insert_stg_observation(
+            cursor, event_id, run_id, product, transformed
+        )
+        insert_fact_observation(
+            cursor, observation_id, run_id, product, transformed
+        )
         conn.commit()
         return True
     except Exception as e:
