@@ -420,9 +420,9 @@ def process_product(
     cursor = conn.cursor()
     try:
         event_id = insert_raw_event(cursor, run_id, product, category_slug)
-        
+
         transformed = transform_product(product)
-        
+
         observation_id = insert_stg_observation(
             cursor, event_id, run_id, product, transformed
         )
@@ -431,16 +431,17 @@ def process_product(
         )
         conn.commit()
         return True
-    except Exception:
+
+    except Exception as e:
         conn.rollback()
         logger.exception(
-            "Product skipped — run_id=%s product_name=%r product_id=%r sku=%r",
-            run_id,
+            "FAILED INSERT — product=%r transformed=%r error=%s",
             product.get("product_name"),
-            product.get("product_id"),
-            product.get("sku"),
+            transformed,
+            str(e),
         )
         return False
+
     finally:
         cursor.close()
 
