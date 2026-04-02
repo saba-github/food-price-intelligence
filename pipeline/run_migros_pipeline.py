@@ -431,11 +431,14 @@ def process_product(
         )
         conn.commit()
         return True
-    except Exception as e:
+    except Exception:
         conn.rollback()
         logger.exception(
-            "Product skipped — name=%r",
+            "Product skipped — run_id=%s product_name=%r product_id=%r sku=%r",
+            run_id,
             product.get("product_name"),
+            product.get("product_id"),
+            product.get("sku"),
         )
         return False
     finally:
