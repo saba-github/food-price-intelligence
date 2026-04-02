@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 from typing import Any, Optional, Tuple
 
 import psycopg2
@@ -8,6 +7,8 @@ import psycopg2.extras
 from dotenv import load_dotenv
 
 from scraper.migros.categories import get_migros_category_products
+
+from pipeline.transforms import transform_product
 
 load_dotenv()
 
