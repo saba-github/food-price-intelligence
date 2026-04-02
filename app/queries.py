@@ -1,4 +1,3 @@
-
 LATEST_DATES_QUERY = """
 select distinct date
 from mart_daily_prices
@@ -10,20 +9,6 @@ select distinct category_name
 from mart_daily_prices
 where category_name is not null
 order by category_name
-"""
-
-PRICE_INTELLIGENCE_BASE_QUERY = """
-select
-    date,
-    standardized_product_name,
-    category_name,
-    normalized_unit,
-    avg_price,
-    min_price,
-    max_price,
-    observation_count
-from mart_daily_prices
-where date = %(selected_date)s
 """
 
 TOP_EXPENSIVE_QUERY = """
@@ -51,7 +36,8 @@ limit 10
 TOP_VOLATILE_QUERY = """
 select
     standardized_product_name,
-    avg_price,
+    category_name,
+    avg_price_per_unit,
     volatility,
     observation_count,
     volatility_level
@@ -70,7 +56,35 @@ where standardized_product_name = %(product_name)s
 order by date
 """
 
-PIPELINE_RUNS_QUERY = """
+TOP_MOVERS_QUERY = """
+select
+    standardized_product_name,
+    category_name,
+    date,
+    latest_price,
+    previous_price,
+    abs_change,
+    pct_change
+from mart_top_movers
+order by pct_change desc
+limit 10
+"""
+
+TOP_DECLINERS_QUERY = """
+select
+    standardized_product_name,
+    category_name,
+    date,
+    latest_price,
+    previous_price,
+    abs_change,
+    pct_change
+from mart_top_movers
+order by pct_change asc
+limit 10
+"""
+
+PIPELINE_HEALTH_QUERY = """
 select
     run_id,
     source_name,
@@ -78,8 +92,11 @@ select
     finished_at,
     status,
     records_scraped,
-    error_message
-from scrape_runs
+    total_checks,
+    passed_checks,
+    failed_checks,
+    pipeline_health_status
+from mart_pipeline_health
 order by run_id desc
 limit 20
 """
