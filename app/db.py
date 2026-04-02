@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import psycopg2
+import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -8,8 +9,13 @@ load_dotenv()
 
 def get_connection():
     database_url = os.getenv("DATABASE_URL")
+
     if not database_url:
-        raise ValueError("DATABASE_URL environment variable is not set.")
+        database_url = st.secrets.get("DATABASE_URL")
+
+    if not database_url:
+        raise ValueError("DATABASE_URL is not set in environment variables or Streamlit secrets.")
+
     return psycopg2.connect(database_url)
 
 
