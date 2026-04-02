@@ -1,8 +1,8 @@
 import streamlit as st
 import plotly.express as px
 
-from app.db import run_query
-from app.queries import PIPELINE_HEALTH_QUERY, QUALITY_RESULTS_QUERY
+from db import run_query
+from queries import PIPELINE_HEALTH_QUERY, QUALITY_RESULTS_QUERY
 
 st.set_page_config(page_title="Pipeline Health", layout="wide")
 
