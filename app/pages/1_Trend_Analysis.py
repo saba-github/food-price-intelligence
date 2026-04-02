@@ -1,8 +1,8 @@
 import streamlit as st
 import plotly.express as px
 
-from app.db import run_query
-from app.queries import (
+from db import run_query
+from queries import  (
     LATEST_DATES_QUERY,
     CATEGORY_LIST_QUERY,
     TOP_EXPENSIVE_QUERY,
