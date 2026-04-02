@@ -418,6 +418,8 @@ def process_product(
     Böylece 500. üründe hata olursa önceki 499 kaybolmaz.
     """
     cursor = conn.cursor()
+    transformed = None
+
     try:
         event_id = insert_raw_event(cursor, run_id, product, category_slug)
 
@@ -429,14 +431,18 @@ def process_product(
         insert_fact_observation(
             cursor, observation_id, run_id, product, transformed
         )
+
         conn.commit()
         return True
 
     except Exception as e:
         conn.rollback()
         logger.exception(
-            "FAILED INSERT — product=%r transformed=%r error=%s",
+            "FAILED INSERT — run_id=%s product_name=%r product_id=%r sku=%r transformed=%r error=%s",
+            run_id,
             product.get("product_name"),
+            product.get("product_id"),
+            product.get("sku"),
             transformed,
             str(e),
         )
