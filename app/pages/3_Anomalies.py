@@ -1,8 +1,8 @@
 import streamlit as st
 import plotly.express as px
 
-from app.db import run_query
-from app.queries import TOP_VOLATILE_QUERY
+from db import run_query
+from queries import TOP_VOLATILE_QUERY
 
 st.set_page_config(page_title="Anomalies", layout="wide")
 
