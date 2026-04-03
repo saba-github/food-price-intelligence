@@ -45,29 +45,60 @@ def get_connection():
 def start_run(cursor, category_slug: str) -> int:
     cursor.execute(
         """
-        INSERT INTO scrape_runs (source_name, status)
-        VALUES (%s, 'running')
+        INSERT INTO scrape_runs (
+            source_name,
+            category_slug,
+            status,
+            triggered_by,
+            pipeline_version
+        )
+        VALUES (%s, %s, 'running', %s, %s)
         RETURNING run_id
         """,
-        (SOURCE_NAME,),
+        (
+            SOURCE_NAME,
+            category_slug,
+            "github_actions",
+            "v2-prep-001",
+        ),
     )
     run_id = cursor.fetchone()[0]
     logger.info("Run started — run_id=%s  category=%s", run_id, category_slug)
     return run_id
 
-
-def finish_run(cursor, run_id: int, records: int):
+def finish_run(
+    cursor,
+    run_id: int,
+    records_scraped: int,
+    records_raw: int,
+    records_stg: int,
+    records_fact: int,
+    records_suspicious: int,
+    records_failed: int,
+):
     cursor.execute(
         """
         UPDATE scrape_runs
         SET finished_at = NOW(),
             status = 'success',
-            records_scraped = %s
+            records_scraped = %s,
+            records_raw = %s,
+            records_stg = %s,
+            records_fact = %s,
+            records_suspicious = %s,
+            records_failed = %s
         WHERE run_id = %s
         """,
-        (records, run_id),
+        (
+            records_scraped,
+            records_raw,
+            records_stg,
+            records_fact,
+            records_suspicious,
+            records_failed,
+            run_id,
+        ),
     )
-    logger.info("Run finished — run_id=%s  records=%s", run_id, records)
 
 
 def fail_run(cursor, run_id: int, error_message: str):
@@ -109,21 +140,28 @@ def insert_raw_event(
 ) -> int:
     raw_payload = {"category_slug": category_slug, **product}
 
+    raw_hash_source = f"{product.get('product_id')}|{product.get('sku')}|{product.get('product_name')}|{product.get('shown_price_tl')}"
+    raw_hash = str(hash(raw_hash_source))
+
     cursor.execute(
         """
         INSERT INTO raw_price_events
-            (run_id, source_name, product_name, product_url,
-             price, currency, raw_payload)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (run_id, source_name, source_product_id, source_sku, category_slug,
+             product_name, product_url, price, currency, raw_hash, raw_payload)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         RETURNING event_id
         """,
         (
             run_id,
             SOURCE_NAME,
+            str(product["product_id"]) if product.get("product_id") is not None else None,
+            product.get("sku"),
+            category_slug,
             product.get("product_name"),
             product.get("product_url"),
             product.get("shown_price_tl"),
             CURRENCY,
+            raw_hash,
             psycopg2.extras.Json(raw_payload),
         ),
     )
