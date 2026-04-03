@@ -351,13 +351,21 @@ def insert_fact_observation(
 
     cursor.execute(
         """
-        INSERT INTO fact_price_observations
-            (observation_id, run_id, source_name, source_product_id, source_sku,
-             product_name, standardized_product_name, product_url,
-             normalized_unit, normalized_quantity, price_per_unit, unit_price_label,
-             price, currency, observed_at,
-             regular_price, discount_rate, brand_name, category_name)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s, %s, %s)
+        INSERT INTO fact_price_observations (
+            observation_id,
+            run_id,
+            source_name,
+            product_name,
+            standardized_product_name,
+            product_url,
+            normalized_unit,
+            normalized_quantity,
+            price,
+            currency,
+            observed_at,
+            product_id
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             observation_id,
@@ -426,7 +434,7 @@ def process_product(
         )
 
         fact_inserted = insert_fact_observation(
-            cursor, observation_id, run_id, product, transformed
+            cursor, observation_id, run_id, product, transformed, product_id
         )
 
         conn.commit()
