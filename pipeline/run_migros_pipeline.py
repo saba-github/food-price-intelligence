@@ -404,11 +404,19 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
         failed_count = 0
 
         for product in scraped_products:
-            ok = process_product(conn, run_id, product, category_slug)
-            if ok:
+            result = process_product(conn, run_id, product, category_slug)
+
+            if result["ok"]:
                 success_count += 1
+                raw_count += result["inserted_raw"]
+                stg_count += result["inserted_stg"]
+                fact_count += result["inserted_fact"]
+
+              if result["is_suspicious"]:
+                    suspicious_count += 1
             else:
                 failed_products.append(product)
+                failed_count += 1
 
         with conn.cursor() as cur:
             cur.execute(
@@ -449,7 +457,16 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             if price_check_status == "fail" or category_check_status == "fail":
                 raise RuntimeError("Data quality checks failed for current run.")
 
-            finish_run(cur, run_id, success_count)
+            finish_run(
+                cur,
+                run_id,
+                records_scraped=len(scraped_products),
+                records_raw=raw_count,
+                records_stg=stg_count,
+                records_fact=fact_count,
+                records_suspicious=suspicious_count,
+                records_failed=failed_count,
+            )
             conn.commit()
 
         logger.info("=" * 50)
