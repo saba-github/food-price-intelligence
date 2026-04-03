@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import os
 from typing import Any
@@ -140,8 +141,14 @@ def insert_raw_event(
 ) -> int:
     raw_payload = {"category_slug": category_slug, **product}
 
-    raw_hash_source = f"{product.get('product_id')}|{product.get('sku')}|{product.get('product_name')}|{product.get('shown_price_tl')}"
-    raw_hash = str(hash(raw_hash_source))
+    raw_hash_source = (
+        f"{product.get('product_id')}|"
+        f"{product.get('sku')}|"
+        f"{product.get('product_name')}|"
+        f"{product.get('shown_price_tl')}|"
+        f"{category_slug}"
+    )
+    raw_hash = hashlib.md5(raw_hash_source.encode("utf-8")).hexdigest()
 
     cursor.execute(
         """
@@ -223,16 +230,44 @@ def insert_stg_observation(
     return cursor.fetchone()[0]
 
 
+def can_insert_to_fact(transformed: dict[str, Any]) -> tuple[bool, str | None]:
+    if transformed.get("is_suspicious"):
+        return False, "suspicious_record"
+
+    required_fields = {
+        "price": transformed.get("price"),
+        "normalized_unit": transformed.get("normalized_unit"),
+        "normalized_quantity": transformed.get("normalized_quantity"),
+        "price_per_unit": transformed.get("price_per_unit"),
+        "standardized_product_name": transformed.get("standardized_product_name"),
+        "category_name": transformed.get("category_name"),
+    }
+
+    for field_name, value in required_fields.items():
+        if value is None:
+            return False, f"missing_{field_name}"
+
+    if transformed["price"] <= 0:
+        return False, "invalid_price"
+
+    if transformed["normalized_quantity"] <= 0:
+        return False, "invalid_normalized_quantity"
+
+    return True, None
+
+
 def insert_fact_observation(
     cursor, observation_id: int, run_id: int, product: dict[str, Any], transformed: dict[str, Any]
-):
-    if transformed["is_suspicious"]:
+) -> bool:
+    can_insert, reason = can_insert_to_fact(transformed)
+
+    if not can_insert:
         logger.info(
-            "Skipping suspicious record for fact table — product=%r price=%r",
+            "Skipping fact insert — product=%r reason=%s",
             product.get("product_name"),
-            transformed["price"],
+            reason,
         )
-        return
+        return False
 
     price = transformed["price"]
     normalized_unit = transformed["normalized_unit"]
@@ -276,8 +311,7 @@ def insert_fact_observation(
             category_name,
         ),
     )
-
-
+    return True
 
 # ---------------------------------------------------------------------------
 # Per-product insert (kendi transaction'ı var)
@@ -287,13 +321,10 @@ def process_product(
     run_id: int,
     product: dict[str, Any],
     category_slug: str,
-) -> bool:
+) -> dict[str, Any]:
     """
     Tek bir ürünü raw → stg → fact olarak yazar.
-    Başarılı → True, hatalı → False (ve hata loglanır).
-
-    Her ürün kendi küçük transaction'ında commit edilir.
-    Böylece 500. üründe hata olursa önceki 499 kaybolmaz.
+    Her ürün kendi transaction'ında çalışır.
     """
     cursor = conn.cursor()
     transformed = None
@@ -306,12 +337,20 @@ def process_product(
         observation_id = insert_stg_observation(
             cursor, event_id, run_id, product, transformed
         )
-        insert_fact_observation(
+
+        fact_inserted = insert_fact_observation(
             cursor, observation_id, run_id, product, transformed
         )
 
         conn.commit()
-        return True
+
+        return {
+            "ok": True,
+            "inserted_raw": 1,
+            "inserted_stg": 1,
+            "inserted_fact": 1 if fact_inserted else 0,
+            "is_suspicious": bool(transformed.get("is_suspicious")),
+        }
 
     except Exception as e:
         conn.rollback()
@@ -324,11 +363,16 @@ def process_product(
             transformed,
             str(e),
         )
-        return False
+        return {
+            "ok": False,
+            "inserted_raw": 0,
+            "inserted_stg": 0,
+            "inserted_fact": 0,
+            "is_suspicious": False,
+        }
 
     finally:
         cursor.close()
-
 
 # ---------------------------------------------------------------------------
 # Main pipeline
@@ -353,6 +397,11 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
 
         success_count = 0
         failed_products: list[dict] = []
+        raw_count = 0
+        stg_count = 0
+        fact_count = 0
+        suspicious_count = 0
+        failed_count = 0
 
         for product in scraped_products:
             ok = process_product(conn, run_id, product, category_slug)
