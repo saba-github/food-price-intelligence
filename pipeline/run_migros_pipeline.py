@@ -412,7 +412,7 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
                 stg_count += result["inserted_stg"]
                 fact_count += result["inserted_fact"]
 
-              if result["is_suspicious"]:
+                if result["is_suspicious"]:
                     suspicious_count += 1
             else:
                 failed_products.append(product)
