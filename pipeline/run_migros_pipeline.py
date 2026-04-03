@@ -474,6 +474,10 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
         logger.info("Category     : %s", category_slug)
         logger.info("Success      : %d", success_count)
         logger.info("Failed       : %d", len(failed_products))
+        logger.info("Raw inserted : %d", raw_count)
+        logger.info("Stg inserted : %d", stg_count)
+        logger.info("Fact inserted: %d", fact_count)
+        logger.info("Suspicious   : %d", suspicious_count)
 
         if failed_products:
             logger.warning("Failed products:")
