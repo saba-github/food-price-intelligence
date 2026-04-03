@@ -1,0 +1,5 @@
+ALTER TABLE raw_price_events
+ADD COLUMN IF NOT EXISTS source_product_id TEXT,
+ADD COLUMN IF NOT EXISTS source_sku TEXT,
+ADD COLUMN IF NOT EXISTS category_slug TEXT,
+ADD COLUMN IF NOT EXISTS raw_hash TEXT;
