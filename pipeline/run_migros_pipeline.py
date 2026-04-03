@@ -401,9 +401,6 @@ def process_product(
     try:
         event_id = insert_raw_event(cursor, run_id, product, category_slug)
 
-        transformed = transform_product(product)
-
-
         insert_stg_source_product(cursor, event_id, run_id, product)
 
         transformed = transform_product(product)
@@ -411,11 +408,14 @@ def process_product(
         insert_stg_normalized_observation(
             cursor, event_id, run_id, product, transformed
         )
-        
-        
-        fact_inserted = insert_fact_observation(
-            cursor, observation_id, run_id, product, transformed
+
+        observation_id = insert_stg_observation(
+            cursor, event_id, run_id, product, transformed
         )
+
+fact_inserted = insert_fact_observation(
+    cursor, observation_id, run_id, product, transformed
+)
 
         conn.commit()
 
