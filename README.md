@@ -207,3 +207,14 @@ To evolve into a **Food Price Intelligence Platform** that:
 * Detects anomalies and trends
 * Supports inflation analysis
 * Enables data-driven insights for consumers and researchers
+
+---
+# kendime not : 
+Mesela:
+
+raw_price_events: source event’in immutable kaydı
+stg_source_products: source alanlarının temizlenmiş ama yorumsuz hali
+stg_normalized_observations: normalize edilmiş ama henüz canonical olmayan gözlem
+fact_price_observations: analytics için kabul edilmiş trusted observation
+dim_products: ürün kimliği ve eşleme mantığının merkezi
+mart_daily_prices: günlük ürün bazlı özet fiyat görünümü
