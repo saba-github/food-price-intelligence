@@ -326,7 +326,12 @@ def can_insert_to_fact(transformed: dict[str, Any]) -> tuple[bool, str | None]:
 
 
 def insert_fact_observation(
-    cursor, observation_id: int, run_id: int, product: dict[str, Any], transformed: dict[str, Any]
+    cursor,
+    observation_id: int,
+    run_id: int,
+    product: dict[str, Any],
+    transformed: dict[str, Any],
+    product_id: int,
 ) -> bool:
     can_insert, reason = can_insert_to_fact(transformed)
 
@@ -409,34 +414,43 @@ def process_product(
     transformed = None
 
     try:
+        # 1️⃣ RAW
         event_id = insert_raw_event(cursor, run_id, product, category_slug)
 
+        # 2️⃣ STG SOURCE
         insert_stg_source_product(cursor, event_id, run_id, product)
 
+        # 3️⃣ TRANSFORM
         transformed = transform_product(product)
 
+        # 4️⃣ DIM PRODUCT (NEW 🔥)
         product_id = get_or_create_product_id(
             cursor,
             transformed["standardized_product_name"],
             transformed.get("category_name"),
         )
 
+        # 5️⃣ STG NORMALIZED (SADECE 1 KEZ!)
         insert_stg_normalized_observation(
             cursor, event_id, run_id, product, transformed
         )
 
-        insert_stg_normalized_observation(
-            cursor, event_id, run_id, product, transformed
-        )
-
+        # 6️⃣ STG OBSERVATION
         observation_id = insert_stg_observation(
             cursor, event_id, run_id, product, transformed
         )
 
+        # 7️⃣ FACT
         fact_inserted = insert_fact_observation(
-            cursor, observation_id, run_id, product, transformed, product_id
+            cursor,
+            observation_id,
+            run_id,
+            product,
+            transformed,
+            product_id,   # ⭐ kritik yeni alan
         )
 
+        # 8️⃣ COMMIT
         conn.commit()
 
         return {
@@ -449,6 +463,7 @@ def process_product(
 
     except Exception as e:
         conn.rollback()
+
         logger.exception(
             "FAILED INSERT — run_id=%s product_name=%r product_id=%r sku=%r transformed=%r error=%s",
             run_id,
@@ -458,6 +473,7 @@ def process_product(
             transformed,
             str(e),
         )
+
         return {
             "ok": False,
             "inserted_raw": 0,
@@ -468,7 +484,6 @@ def process_product(
 
     finally:
         cursor.close()
-
 
 def get_or_create_product_id(
     cursor,
