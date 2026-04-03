@@ -413,9 +413,9 @@ def process_product(
             cursor, event_id, run_id, product, transformed
         )
 
-fact_inserted = insert_fact_observation(
-    cursor, observation_id, run_id, product, transformed
-)
+        fact_inserted = insert_fact_observation(
+            cursor, observation_id, run_id, product, transformed
+        )
 
         conn.commit()
 
