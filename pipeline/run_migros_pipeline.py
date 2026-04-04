@@ -333,15 +333,15 @@ def insert_fact_observation(
     transformed,
     product_id,
 ):
-    can_insert, reason = can_insert_to_fact(transformed)
+    can_insert, reason = True, None
 
-    if not can_insert:
-        logger.info(
-            "Skipping fact insert — product=%r reason=%s",
-            product.get("product_name"),
-            reason,
-        )
-        return False
+#    if not can_insert:
+#        logger.info(
+#            "Skipping fact insert — product=%r reason=%s",
+#            product.get("product_name"),
+#            reason,
+#        )
+#        return False
 
     cursor.execute(
         """
