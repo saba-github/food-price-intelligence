@@ -348,6 +348,7 @@ def insert_fact_observation(
         INSERT INTO fact_price_observations (
             observation_id,
             run_id,
+            source_name,
             product_id,
             standardized_product_name,
             price,
@@ -359,11 +360,12 @@ def insert_fact_observation(
             unit_price_label,
             observed_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        VALUES (%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """,
         (
             observation_id,
             run_id,
+            SOURCE_NAME,
             product_id,
             transformed["standardized_product_name"],
             transformed["price"],
