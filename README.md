@@ -1,6 +1,6 @@
 #  Food Price Intelligence
 
-> An end-to-end data platform for collecting, standardizing, and analyzing supermarket price data.
+> Production-style data pipeline for retail price intelligence with data quality validation, unit normalization, and analytics-ready datasets.
 
 ---
 
