@@ -8,7 +8,12 @@
 
 Food Price Intelligence is a production-style data pipeline that transforms messy retail price data into clean, analytics-ready datasets.
 
-It goes beyond scraping — the system focuses on **data quality, normalization, and reliable analytics**, enabling price comparison, trend analysis, and anomaly detection.
+It enables:
+
+- price monitoring across time
+- detection of unusual price behavior
+- building datasets ready for forecasting models
+- scalable ingestion of multiple retailers in the future
 
 ---
 
@@ -30,6 +35,8 @@ This project solves that by:
 ---
 
 ##  Architecture
+
+Each layer is designed to be **independently testable and replaceable**.
 
 The system follows a layered data architecture:
 
@@ -63,6 +70,11 @@ The system follows a layered data architecture:
         │  DASHBOARD    │
         │  (Streamlit)  │
         └───────────────┘
+
+
+
+
+        
 
 ---
 ### Layer Responsibilities
@@ -204,4 +216,22 @@ Otherwise → excluded from analytics layer
 - **dotenv**
 
 ---
+##  Project Structure
+pipeline/       → ETL logic
+scraper/        → data extraction
+database/       → SQL migrations
+app/            → Streamlit dashboard
+tests/          → unit tests
+docs/           → documentation & images
+
+
+
+---
+
+##  Future Improvements
+
+- multi-retailer support (Carrefour, A101, etc.)
+- price forecasting models
+- alerting system for anomalies
+- API layer for external consumption
 
