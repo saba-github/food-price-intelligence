@@ -21,6 +21,3 @@ CREATE INDEX IF NOT EXISTS idx_raw_price_events_run_id
 
 CREATE INDEX IF NOT EXISTS idx_raw_price_events_raw_hash
     ON raw_price_events(raw_hash);
-
-CREATE INDEX IF NOT EXISTS idx_raw_price_events_raw_hash
-    ON raw_price_events(raw_hash);
