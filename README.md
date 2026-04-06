@@ -1,220 +1,192 @@
-#  Food Price Intelligence System
+#  Food Price Intelligence
 
-*A production-grade layered data pipeline for supermarket price intelligence.*
-
-Food Price Intelligence is an end-to-end data engineering project that captures, processes, and analyzes supermarket price data with a structured, layered architecture.
-
-The system is designed to produce **historical, analytics-ready datasets** while ensuring traceability, data quality, and reproducibility.
+> An end-to-end data platform for collecting, standardizing, and analyzing supermarket price data.
 
 ---
 
-#  What This Project Does
+##  Overview
 
-* Scrapes real-time food prices from supermarkets (currently Migros)
-* Stores raw data for full traceability
-* Applies structured transformations in layered architecture
-* Filters unreliable data using rule-based quality checks
-* Produces a clean **fact table for analytics**
-* Computes **unit-normalized prices (TRY/kg, TRY/piece)**
-* Runs automatically via **GitHub Actions + Neon PostgreSQL**
+Food Price Intelligence is a production-style data pipeline that transforms messy retail price data into clean, analytics-ready datasets.
+
+It goes beyond scraping — the system focuses on **data quality, normalization, and reliable analytics**, enabling price comparison, trend analysis, and anomaly detection.
 
 ---
 
-#  Architecture
+##  What problem does it solve?
 
-```
+Retail price data is:
+
+- inconsistent (units, naming, packaging)
+- noisy (duplicates, missing fields, invalid values)
+- hard to compare across products
+
+This project solves that by:
+
+- standardizing product names and units
+- calculating comparable **price per unit**
+- filtering invalid and suspicious data
+- building trusted datasets for analytics
+
+---
+
+##  Architecture
+
 Source (Migros API)
-        │
-        ▼
-Raw Layer (raw_price_events)
-        │
-        ▼
-Staging Layer (stg_price_observations)
-        │
-        ▼
-Fact Layer (fact_price_observations)
-        │
-        ▼
-Serving Layer (Analysis / Dashboard / Forecasting)
-```
-
----
-
-#  Data Model
-
-## Raw Layer — `raw_price_events`
-
-* Stores raw scraped JSON payload
-* No transformations applied
-* Enables full reproducibility and debugging
-
-## Staging Layer — `stg_price_observations`
-
-* Normalizes:
-
-  * product name
-  * unit (kg / piece)
-* Computes:
-
-  * `normalized_quantity`
-  * `price_per_unit`
-  * `unit_price_label` (TRY/kg, TRY/piece)
-* Applies data quality rules
-* Flags suspicious records:
-
-  * `is_suspicious`
-  * `suspicious_reason`
-
-## Fact Layer — `fact_price_observations`
-
-* Stores only **clean, trusted data**
-* Used for analytics and downstream systems
-* Suspicious records are excluded
-
----
-
-#  Data Quality System
-
-The pipeline includes rule-based validation:
-
-### Detects:
-
-* Missing or null prices
-* Invalid prices (≤ 0)
-* Extreme outliers
-* Inconsistent unit-price relationships
-
-### Behavior:
-
-* Suspicious records → kept in staging
-* Clean records → promoted to fact layer
-
----
-
-# ⚙️ Pipeline Execution
-
-The pipeline is fully automated:
-
-* Runs via **GitHub Actions**
-* Uses **Neon PostgreSQL** as cloud database
-* Each run is tracked in `scrape_runs`
-* Data is stored as **append-only observations**
-
----
-##  Data Quality Metrics
-
-Latest pipeline run quality:
-
-- Raw records: 30
-- Staging records: 30
-- Fact records: 30
-- Data loss: 0%
-- Null values: 0%
-- Suspicious records: 0%
-
-This ensures that the pipeline produces fully consistent and analytics-ready datasets.
-
------
-
-#  Example Output
-
-Each observation includes:
-
-* `product_name`
-* `price`
-* `normalized_unit`
-* `price_per_unit`
-* `unit_price_label` (e.g. TRY/kg)
-
-This enables direct comparison across products and time.
-
----
-
-#  Tech Stack
-
-* Python
-* PostgreSQL (Neon)
-* Requests / API scraping
-* Pandas
-* GitHub Actions (CI/CD)
-
----
-
-#  Repository Structure
-
-```
-food-price-intelligence
-│
-├── scraper/
-│   └── migros/
-│
-├── pipeline/
-│   └── run_migros_pipeline.py
-│
-├── database/
-│   └── migrations/
-│
-├── docs/
-│   └── architecture.md
-│
-├── .github/workflows/
-│
-└── README.md
-```
+↓
+RAW (raw_price_events)
+↓
+STAGING (stg_source_products, stg_price_observations)
+↓
+FACT (fact_price_observations)
+↓
+MART (analytics-ready tables)
+↓
+Streamlit Dashboard
 
 ---
 
 
+---
 
-#  Current Status
+## ⚙️ Key Features
 
-✔ Migros scraping implemented
-✔ Layered pipeline (raw → staging → fact)
-✔ Data quality validation
-✔ Unit normalization (price per kg / piece)
-✔ Automated pipeline via GitHub Actions
-✔ Cloud storage with Neon PostgreSQL
+###  End-to-End Data Pipeline
+- Automated ingestion → transformation → loading
+- Fully orchestrated with GitHub Actions
+
+###  Product & Unit Standardization
+- Normalizes units (e.g. gram → kg, piece handling)
+- Cleans and standardizes product names
+- Enables apples-to-apples price comparison
+
+###  Price Intelligence Layer
+- Computes **price_per_unit**
+- Tracks **discounts and regular prices**
+- Aggregates daily product-level insights
+
+###  Data Quality Framework
+Each pipeline run validates:
+
+- `price_per_unit completeness`
+- `category_name completeness`
+
+Runs fail automatically if data is unreliable.
+
+###  Suspicious Data Detection
+Flags:
+- invalid prices (≤ 0)
+- extreme prices (> 500 TRY)
+- small-package price anomalies
+
+###  Observability & Run Tracking
+Each run tracks:
+
+- records scraped / inserted
+- suspicious records
+- failed inserts
+- quality check results
+- pipeline health status
+
+###  Analytics Layer (MART)
+Materialized views provide:
+
+- daily average prices
+- top movers (price changes)
+- anomaly detection
+- pipeline health monitoring
+
+###  Interactive Dashboard (Streamlit)
+- Trend analysis
+- Cheapest / most expensive products
+- Price change tracking
+- Anomaly insights
+- Pipeline monitoring
 
 ---
 
-#  Next Steps
+##  Data Model
 
-* Add Carrefour & A101 data sources
-* Build cross-market price comparison
-* Improve anomaly detection (statistical)
-* Develop analytical queries & dashboards
-* Add forecasting models
+### RAW
+- `raw_price_events`
+- Stores unprocessed API responses
+
+### STAGING
+- `stg_source_products`
+- `stg_price_observations`
+- `stg_normalized_observations`
+
+Handles cleaning, normalization, and enrichment.
+
+### FACT
+- `fact_price_observations`
+- Trusted, analytics-ready dataset
+
+### MART
+- `mart_daily_prices`
+- `mart_top_movers`
+- `mart_price_anomalies`
+- `mart_pipeline_health`
+
+---
+
+##  Example Transformations
+
+- `"Domates Kokteyl 500 g"` → `domates kokteyl`
+- `500 gram` → `0.5 kg`
+- `price_per_unit = price / normalized_quantity`
+- `"TRY/kg"` labeling
 
 ---
 
-#  Why This Project Matters
+##  Data Quality Logic
 
-This project demonstrates:
+A record is inserted into FACT only if:
 
-* Real-world data pipeline architecture
-* Data quality engineering
-* Cloud-based data workflows
-* Reproducible analytics datasets
-* End-to-end data system design
+- not suspicious
+- price is valid
+- normalized unit & quantity exist
+- standardized product name exists
+- category is populated
+
+Otherwise → excluded from analytics layer
+
+---
+
+##  Pipeline Flow
+
+1. Start run (tracked in `scrape_runs`)
+2. Scrape products from source
+3. Insert RAW data
+4. Transform (normalize + enrich)
+5. Insert STAGING tables
+6. Validate data quality
+7. Insert FACT data
+8. Refresh MART views
+9. Mark run as success / failure
 
 ---
 
-#  Vision
+##  Tech Stack
 
-To evolve into a **Food Price Intelligence Platform** that:
-
-* Tracks food prices across markets
-* Detects anomalies and trends
-* Supports inflation analysis
-* Enables data-driven insights for consumers and researchers
+- **Python**
+- **PostgreSQL (Neon)**
+- **Streamlit**
+- **GitHub Actions (CI/CD)**
+- **psycopg2**
+- **dotenv**
 
 ---
-# kendime not : 
-Mesela:
 
-raw_price_events: source event’in immutable kaydı
-stg_source_products: source alanlarının temizlenmiş ama yorumsuz hali
-stg_normalized_observations: normalize edilmiş ama henüz canonical olmayan gözlem
-fact_price_observations: analytics için kabul edilmiş trusted observation
-dim_products: ürün kimliği ve eşleme mantığının merkezi
-mart_daily_prices: günlük ürün bazlı özet fiyat görünümü
+##  How to Run
+
+```bash
+git clone https://github.com/your-username/food-price-intelligence.git
+cd food-price-intelligence
+
+pip install -r requirements.txt
+
+# set env
+export DATABASE_URL=your_neon_connection
+
+# run pipeline
+python pipeline/run_migros_pipeline.py
