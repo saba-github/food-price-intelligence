@@ -617,8 +617,82 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             )
 
             refresh_materialized_views(cur)
-            conn.commit()
+            # ---------------------------
+            # MART DATA QUALITY CHECKS
+            # ---------------------------
 
+
+            # Check 1: latest mart date için avg_price null olmamalı
+            cur.execute(
+                """
+                select max(date)
+                from mart_daily_prices
+                """
+            )
+            latest_mart_date = cur.fetchone()[0]
+
+            cur.execute(
+                """
+                select count(*)
+                from mart_daily_prices
+                where date = %s
+                  and avg_price is null
+                """,
+                (latest_mart_date,),
+            )
+            null_avg_count = cur.fetchone()[0]
+
+            mart_avg_status = "pass" if null_avg_count == 0 else "fail"
+
+            log_quality_check(
+                cur,
+                run_id,
+                "mart_avg_price_not_null_latest_date",
+                mart_avg_status,
+                null_avg_count,
+                0,
+                "avg_price should not be null in mart_daily_prices for the latest mart date",
+            )
+
+            # Check 2: full grain duplicate kontrolü
+            cur.execute(
+                """
+                select count(*)
+                from (
+                    select
+                        date,
+                        standardized_product_name,
+                        category_name,
+                        normalized_unit,
+                        count(*)
+                    from mart_daily_prices
+                    group by 1,2,3,4
+                    having count(*) > 1
+                ) t
+                """
+            )
+            duplicate_count = cur.fetchone()[0]
+
+            mart_dup_status = "pass" if duplicate_count == 0 else "fail"
+
+            log_quality_check(
+                cur,
+                run_id,
+                "mart_no_duplicates_full_grain",
+                mart_dup_status,
+                duplicate_count,
+                0,
+                "mart_daily_prices should not have duplicate rows at (date, product, category, unit) grain",
+            )
+
+            if mart_avg_status == "fail" or mart_dup_status == "fail":
+                raise RuntimeError("Mart data quality checks failed.")
+
+
+
+
+
+        
         logger.info("=" * 50)
         logger.info("Run ID       : %s", run_id)
         logger.info("Category     : %s", category_slug)
