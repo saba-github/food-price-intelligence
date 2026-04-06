@@ -101,6 +101,11 @@ def finish_run(
         ),
     )
 
+def refresh_materialized_views(cursor):
+    cursor.execute("REFRESH MATERIALIZED VIEW mart_daily_prices")
+    cursor.execute("REFRESH MATERIALIZED VIEW mart_top_movers")
+    cursor.execute("REFRESH MATERIALIZED VIEW mart_price_anomalies")
+    cursor.execute("REFRESH MATERIALIZED VIEW mart_pipeline_health")
 
 def fail_run(cursor, run_id: int, error_message: str):
     cursor.execute(
@@ -333,15 +338,15 @@ def insert_fact_observation(
     transformed,
     product_id,
 ):
-    can_insert, reason = True, None
+    can_insert, reason = can_insert_to_fact(transformed)
 
-#    if not can_insert:
-#        logger.info(
-#            "Skipping fact insert — product=%r reason=%s",
-#            product.get("product_name"),
-#            reason,
-#        )
-#        return False
+    if not can_insert:
+        logger.info(
+            "Skipping fact insert — product=%r reason=%s",
+            product.get("product_name"),
+            reason,
+        )
+        return False
 
     cursor.execute(
         """
@@ -604,6 +609,8 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
                 records_suspicious=suspicious_count,
                 records_failed=failed_count,
             )
+
+            refresh_materialized_views(cur)
             conn.commit()
 
         logger.info("=" * 50)
