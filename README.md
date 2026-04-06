@@ -31,17 +31,38 @@ This project solves that by:
 
 ##  Architecture
 
-Source (Migros API)
-↓
-RAW (raw_price_events)
-↓
-STAGING (stg_source_products, stg_price_observations)
-↓
-FACT (fact_price_observations)
-↓
-MART (analytics-ready tables)
-↓
-Streamlit Dashboard
+The system follows a layered data architecture:
+
+        ┌───────────────┐
+        │  Data Source  │
+        │  (Migros API) │
+        └───────┬───────┘
+                ↓
+        ┌───────────────┐
+        │      RAW      │
+        │ raw_price_events
+        └───────┬───────┘
+                ↓
+        ┌───────────────┐
+        │    STAGING    │
+        │ stg_* tables  │
+        │ (clean + normalize)
+        └───────┬───────┘
+                ↓
+        ┌───────────────┐
+        │     FACT      │
+        │ trusted data  │
+        └───────┬───────┘
+                ↓
+        ┌───────────────┐
+        │     MART      │
+        │ analytics     │
+        └───────┬───────┘
+                ↓
+        ┌───────────────┐
+        │  DASHBOARD    │
+        │  (Streamlit)  │
+        └───────────────┘
 
 ---
 
