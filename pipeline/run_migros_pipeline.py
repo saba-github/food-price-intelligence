@@ -358,14 +358,17 @@ def insert_fact_observation(
             standardized_product_name,
             price,
             regular_price,
+            discount_rate,
             currency,
             normalized_unit,
             normalized_quantity,
             price_per_unit,
             unit_price_label,
+            brand_name,
+            category_name,
             observed_at
         )
-        VALUES (%s,%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
         """,
         (
             observation_id,
@@ -375,12 +378,15 @@ def insert_fact_observation(
             transformed["standardized_product_name"],
             transformed["price"],
             transformed["regular_price"],
+            transformed["discount_rate"],
             transformed["currency"],
             transformed["normalized_unit"],
             transformed["normalized_quantity"],
             transformed["price_per_unit"],
             transformed["unit_price_label"],
-        ),
+            transformed["brand_name"],
+            transformed["category_name"],
+            )
     )
 
     return True
