@@ -1,6 +1,4 @@
-DROP MATERIALIZED VIEW IF EXISTS mart_daily_prices;
-
-CREATE MATERIALIZED VIEW mart_daily_prices AS
+CREATE TABLE IF NOT EXISTS mart_daily_prices AS
 SELECT
     DATE(observed_at) as date,
     standardized_product_name,
@@ -12,6 +10,3 @@ SELECT
     COUNT(*) as observation_count
 FROM fact_price_observations
 GROUP BY 1,2,3,4;
-
-CREATE INDEX IF NOT EXISTS idx_mart_daily_prices_date
-ON mart_daily_prices(date);
