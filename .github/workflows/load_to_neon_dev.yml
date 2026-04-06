@@ -1,0 +1,53 @@
+name: Load data to Neon (DEV)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+
+jobs:
+  run-etl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Run database migrations
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+        run: |
+          set -euo pipefail
+          echo "Starting migrations on DEV..."
+          ls -1 database/migrations/*.sql | sort
+
+          for file in $(ls -1 database/migrations/*.sql | sort); do
+            echo "Running migration: $file"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
+          done
+
+      - name: Run tests
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: pytest -q
+
+      - name: Run script
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+          PYTHONPATH: ${{ github.workspace }}
+        run: python pipeline/run_migros_pipeline.py
