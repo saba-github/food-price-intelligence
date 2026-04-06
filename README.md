@@ -65,7 +65,14 @@ The system follows a layered data architecture:
         └───────────────┘
 
 ---
+### Layer Responsibilities
 
+- **RAW** → stores unprocessed source data for traceability  
+- **STAGING** → handles cleaning, normalization, enrichment  
+- **FACT** → contains validated, analytics-ready observations  
+- **MART** → optimized for querying, aggregation, and dashboards  
+
+This separation ensures **data quality, reproducibility, and scalability**.
 
 ---
 
@@ -198,16 +205,3 @@ Otherwise → excluded from analytics layer
 
 ---
 
-##  How to Run
-
-```bash
-git clone https://github.com/your-username/food-price-intelligence.git
-cd food-price-intelligence
-
-pip install -r requirements.txt
-
-# set env
-export DATABASE_URL=your_neon_connection
-
-# run pipeline
-python pipeline/run_migros_pipeline.py
