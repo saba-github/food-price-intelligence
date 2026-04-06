@@ -1,3 +1,6 @@
+ALTER TABLE fact_price_observations
+ADD COLUMN IF NOT EXISTS product_id INTEGER;
+
 DO $$
 BEGIN
     IF NOT EXISTS (
