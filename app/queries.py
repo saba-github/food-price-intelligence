@@ -18,6 +18,7 @@ select
     avg_price
 from mart_daily_prices
 where date = %(selected_date)s
+  and avg_price is not null
 order by avg_price desc
 limit 10
 """
@@ -29,6 +30,7 @@ select
     avg_price
 from mart_daily_prices
 where date = %(selected_date)s
+  and avg_price is not null
 order by avg_price asc
 limit 10
 """
@@ -92,9 +94,17 @@ select
     finished_at,
     status,
     records_scraped,
+    records_raw,
+    records_stg,
+    records_fact,
+    records_suspicious,
+    records_failed,
+    run_duration_seconds,
     total_checks,
     passed_checks,
     failed_checks,
+    last_failed_check_name,
+    last_failed_check_details,
     pipeline_health_status
 from mart_pipeline_health
 order by run_id desc
