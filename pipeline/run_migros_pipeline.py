@@ -688,6 +688,9 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             if mart_avg_status == "fail" or mart_dup_status == "fail":
                 raise RuntimeError("Mart data quality checks failed.")
 
+            conn.commit()
+            logger.info("Run finalized and committed — run_id=%s", run_id)
+
 
 
 
