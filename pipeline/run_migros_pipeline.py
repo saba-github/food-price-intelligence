@@ -155,29 +155,63 @@ def insert_raw_event(
     )
     raw_hash = hashlib.md5(raw_hash_source.encode("utf-8")).hexdigest()
 
+    scraped_at = product.get("scraped_at")
+    if scraped_at is None:
+        cursor.execute("SELECT NOW()")
+        scraped_at = cursor.fetchone()[0]
+
+    source_product_id = (
+        str(product["product_id"]) if product.get("product_id") is not None else None
+    )
+
     cursor.execute(
         """
         INSERT INTO raw_price_events
             (run_id, source_name, source_product_id, source_sku, category_slug,
-             product_name, product_url, price, currency, raw_hash, raw_payload)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+             product_name, product_url, price, currency, scraped_at, raw_hash, raw_payload)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source_name, source_product_id, scraped_at)
+        DO NOTHING
         RETURNING event_id
         """,
         (
             run_id,
             SOURCE_NAME,
-            str(product["product_id"]) if product.get("product_id") is not None else None,
+            source_product_id,
             product.get("sku"),
             category_slug,
             product.get("product_name"),
             product.get("product_url"),
             product.get("shown_price_tl"),
             CURRENCY,
+            scraped_at,
             raw_hash,
             psycopg2.extras.Json(raw_payload),
         ),
     )
-    return cursor.fetchone()[0]
+    row = cursor.fetchone()
+    if row:
+        return row[0]
+
+    cursor.execute(
+        """
+        SELECT event_id
+        FROM raw_price_events
+        WHERE source_name = %s
+          AND source_product_id = %s
+          AND scraped_at = %s
+        LIMIT 1
+        """,
+        (
+            SOURCE_NAME,
+            source_product_id,
+            scraped_at,
+        ),
+    )
+    existing_row = cursor.fetchone()
+    if not existing_row:
+        raise ValueError("Could not get event_id from raw_price_events after conflict.")
+    return existing_row[0]
 
 def insert_stg_source_product(
     cursor,
@@ -348,14 +382,26 @@ def insert_fact_observation(
         )
         return False
 
+    observed_at = product.get("scraped_at")
+    if observed_at is None:
+        cursor.execute("SELECT NOW()")
+        observed_at = cursor.fetchone()[0]
+
+    source_product_id = (
+        str(product["product_id"]) if product.get("product_id") is not None else None
+    )
+
     cursor.execute(
         """
         INSERT INTO fact_price_observations (
             observation_id,
             run_id,
             source_name,
+            source_product_id,
             product_id,
+            product_name,
             standardized_product_name,
+            product_url,
             price,
             regular_price,
             discount_rate,
@@ -368,14 +414,19 @@ def insert_fact_observation(
             category_name,
             observed_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source_name, source_product_id, observed_at)
+        DO NOTHING
         """,
         (
             observation_id,
             run_id,
             SOURCE_NAME,
+            source_product_id,
             product_id,
+            product.get("product_name"),
             transformed["standardized_product_name"],
+            product.get("product_url"),
             transformed["price"],
             transformed["regular_price"],
             transformed["discount_rate"],
@@ -386,11 +437,11 @@ def insert_fact_observation(
             transformed["unit_price_label"],
             transformed["brand_name"],
             transformed["category_name"],
-            )
+            observed_at,
+        ),
     )
 
-    return True
-
+    return cursor.rowcount == 1
 # ---------------------------------------------------------------------------
 # Per-product insert (kendi transaction'ı var)
 # ---------------------------------------------------------------------------
