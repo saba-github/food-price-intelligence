@@ -16,6 +16,24 @@ from fact_price_observations
 where price_per_unit is not null;
 """
 
+
+TOTAL_RUNS_QUERY = """
+select count(*) as total_runs
+from scrape_runs;
+"""
+
+
+TOP_DECLINERS_HOME_QUERY = """
+select
+    standardized_product_name,
+    category_name,
+    pct_change
+from mart_top_movers
+where pct_change is not null
+order by pct_change asc
+limit 3;
+"""
+
 LATEST_RUN_QUERY = """
 select
     run_id,
@@ -52,16 +70,22 @@ from mart_daily_prices;
 summary_df = run_query(HOME_SUMMARY_QUERY)
 latest_run_df = run_query(LATEST_RUN_QUERY)
 quick_insights_df = run_query(QUICK_INSIGHTS_QUERY)
+decliners_df = run_query(TOP_DECLINERS_HOME_QUERY)
 latest_date_df = run_query(LATEST_DATE_QUERY)
+total_runs_df = run_query(TOTAL_RUNS_QUERY)
 
 product_count = None
 observation_count = None
 avg_price_per_unit = None
+total_runs = None
 
 if not summary_df.empty:
     product_count = int(summary_df.iloc[0]["product_count"])
     observation_count = int(summary_df.iloc[0]["observation_count"])
     avg_price_per_unit = summary_df.iloc[0]["avg_price_per_unit"]
+
+if not total_runs_df.empty:
+    total_runs = int(total_runs_df.iloc[0]["total_runs"])
 
 latest_run = latest_run_df.iloc[0] if not latest_run_df.empty else None
 latest_date = latest_date_df.iloc[0]["latest_date"] if not latest_date_df.empty else None
@@ -69,7 +93,8 @@ latest_date = latest_date_df.iloc[0]["latest_date"] if not latest_date_df.empty 
 # -----------------------------
 # Title
 # -----------------------------
-st.title("Food Price Intelligence Dashboard")
+st.title("Food Price Intelligence System")
+st.caption("A production-style data pipeline for monitoring retail price movements.")
 
 if latest_date is not None:
     st.caption(f"Latest analytics date: {latest_date}")
@@ -77,16 +102,17 @@ if latest_date is not None:
 # -----------------------------
 # KPI Cards
 # -----------------------------
-c1, c2, c3, c4 = st.columns(4)
+c1, c2, c3, c4, c5 = st.columns(5)
 
 c1.metric("Products", product_count)
 c2.metric("Observations", observation_count)
 c3.metric("Avg Price / Unit", avg_price_per_unit)
+c4.metric("Total Runs", total_runs)
 
 if latest_run is not None:
-    c4.metric("Latest Run Health", latest_run["pipeline_health_status"])
+    c5.metric("Latest Run Health", latest_run["pipeline_health_status"])
 else:
-    c4.metric("Latest Run Health", "N/A")
+    c5.metric("Latest Run Health", "N/A")
 
 # -----------------------------
 # Latest run summary
@@ -121,21 +147,39 @@ st.code("Scraper → Raw → Staging → Fact → Mart → Dashboard", language=
 # -----------------------------
 # Quick insights
 # -----------------------------
-st.markdown("## Quick Insights")
+left_insight, right_insight = st.columns(2)
 
-if quick_insights_df.empty:
-    st.warning("No insight data available yet.")
-else:
-    for _, row in quick_insights_df.iterrows():
-        product = row["standardized_product_name"]
-        category = row["category_name"]
-        pct_change = row["pct_change"]
+with left_insight:
+    st.markdown("## Quick Price Increases")
 
-        category_text = f" ({category})" if category else ""
-        st.markdown(
-            f"- **{product}**{category_text} increased by **{pct_change}%** in the most recent comparison window."
-        )
+    if quick_insights_df.empty:
+        st.warning("No increase insights available yet.")
+    else:
+        for _, row in quick_insights_df.iterrows():
+            product = row["standardized_product_name"]
+            category = row["category_name"]
+            pct_change = row["pct_change"]
 
+            category_text = f" ({category})" if category else ""
+            st.markdown(
+                f"- **{product}**{category_text} increased by **{pct_change:.1f}%** compared to the previous observed period."
+            )
+
+with right_insight:
+    st.markdown("## Quick Price Drops")
+
+    if decliners_df.empty:
+        st.warning("No decline insights available yet.")
+    else:
+        for _, row in decliners_df.iterrows():
+            product = row["standardized_product_name"]
+            category = row["category_name"]
+            pct_change = row["pct_change"]
+
+            category_text = f" ({category})" if category else ""
+            st.markdown(
+                f"- **{product}**{category_text} decreased by **{abs(pct_change):.1f}%** compared to the previous observed period."
+            )
 # -----------------------------
 # Two-column explanation area
 # -----------------------------
