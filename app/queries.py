@@ -58,6 +58,63 @@ where standardized_product_name = %(product_name)s
 order by date
 """
 
+
+HOME_TOP_MOVER_CARD_QUERY = """
+select
+    standardized_product_name,
+    category_name,
+    latest_price,
+    pct_change
+from mart_top_movers
+where pct_change is not null
+order by pct_change desc
+limit 3;
+"""
+
+HOME_TOP_DECLINER_CARD_QUERY = """
+select
+    standardized_product_name,
+    category_name,
+    latest_price,
+    pct_change
+from mart_top_movers
+where pct_change is not null
+order by pct_change asc
+limit 3;
+"""
+
+HOME_RECENT_TRENDS_QUERY = """
+with latest_prices as (
+    select
+        standardized_product_name,
+        avg_price,
+        date,
+        row_number() over (
+            partition by standardized_product_name
+            order by date desc
+        ) as rn
+    from mart_daily_prices
+    where avg_price is not null
+),
+trend_base as (
+    select
+        standardized_product_name
+    from mart_top_movers
+    where pct_change is not null
+    order by abs(pct_change) desc
+    limit 5
+)
+select
+    mdp.date,
+    mdp.standardized_product_name,
+    mdp.avg_price
+from mart_daily_prices mdp
+join trend_base tb
+    on mdp.standardized_product_name = tb.standardized_product_name
+where mdp.avg_price is not null
+order by mdp.standardized_product_name, mdp.date;
+"""
+
 TOP_MOVERS_QUERY = """
 select
     standardized_product_name,

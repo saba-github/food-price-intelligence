@@ -1,8 +1,15 @@
 import streamlit as st
+import plotly.graph_objects as go
 
 from db import run_query
+from queries import (
+    HOME_TOP_MOVER_CARD_QUERY,
+    HOME_TOP_DECLINER_CARD_QUERY,
+    HOME_RECENT_TRENDS_QUERY,
+)
 
 st.set_page_config(page_title="Food Price Intelligence", layout="wide")
+st.markdown("Real-time retail price intelligence powered by automated data pipelines.")
 
 # -----------------------------
 # Queries
@@ -23,16 +30,7 @@ from scrape_runs;
 """
 
 
-TOP_DECLINERS_HOME_QUERY = """
-select
-    standardized_product_name,
-    category_name,
-    pct_change
-from mart_top_movers
-where pct_change is not null
-order by pct_change asc
-limit 3;
-"""
+
 
 LATEST_RUN_QUERY = """
 select
@@ -48,16 +46,7 @@ order by run_id desc
 limit 1;
 """
 
-QUICK_INSIGHTS_QUERY = """
-select
-    standardized_product_name,
-    category_name,
-    pct_change
-from mart_top_movers
-where pct_change is not null
-order by pct_change desc
-limit 3;
-"""
+
 
 LATEST_DATE_QUERY = """
 select max(date) as latest_date
@@ -69,8 +58,6 @@ from mart_daily_prices;
 # -----------------------------
 summary_df = run_query(HOME_SUMMARY_QUERY)
 latest_run_df = run_query(LATEST_RUN_QUERY)
-quick_insights_df = run_query(QUICK_INSIGHTS_QUERY)
-decliners_df = run_query(TOP_DECLINERS_HOME_QUERY)
 latest_date_df = run_query(LATEST_DATE_QUERY)
 total_runs_df = run_query(TOTAL_RUNS_QUERY)
 
@@ -111,105 +98,118 @@ c4.metric("Total Runs", total_runs)
 
 if latest_run is not None:
     c5.metric("Latest Run Health", latest_run["pipeline_health_status"])
+    st.success(
+        f"Latest pipeline run #{latest_run['run_id']} completed with "
+        f"{latest_run['passed_checks']} / {latest_run['total_checks']} checks passed."
+    )
 else:
     c5.metric("Latest Run Health", "N/A")
 
-# -----------------------------
-# Latest run summary
-# -----------------------------
-if latest_run is not None:
-    st.info(
-        f"Latest run #{latest_run['run_id']} finished with status "
-        f"**{latest_run['status']}**. "
-        f"Checks passed: **{latest_run['passed_checks']} / {latest_run['total_checks']}**."
-    )
+# ---------------------------------
+# Home insight cards
+# ---------------------------------
+movers_df = run_query(HOME_TOP_MOVER_CARD_QUERY)
+decliners_df = run_query(HOME_TOP_DECLINER_CARD_QUERY)
+trends_df = run_query(HOME_RECENT_TRENDS_QUERY)
 
-# -----------------------------
-# System overview
-# -----------------------------
-st.markdown("### System Overview")
-st.markdown(
-    """
-A production-style retail price intelligence system built with:
+left_col, mid_col, right_col = st.columns([1, 1, 1.3])
 
-- layered data architecture (`raw → staging → fact → mart`)
-- automated data quality checks
-- unit normalization
-- anomaly detection
-- GitHub Actions CI/CD
-- Neon PostgreSQL
-- Streamlit dashboard
-"""
-)
+with left_col:
+    st.markdown("### Price increases   ↑ top movers")
 
-st.code("Scraper → Raw → Staging → Fact → Mart → Dashboard", language="text")
-
-# -----------------------------
-# Quick insights
-# -----------------------------
-left_insight, right_insight = st.columns(2)
-
-with left_insight:
-    st.markdown("## Quick Price Increases")
-
-    if quick_insights_df.empty:
-        st.warning("No increase insights available yet.")
+    if movers_df.empty:
+        st.info("No mover data available.")
     else:
-        for _, row in quick_insights_df.iterrows():
+        for _, row in movers_df.iterrows():
             product = row["standardized_product_name"]
-            category = row["category_name"]
-            pct_change = row["pct_change"]
+            category = row["category_name"] if row["category_name"] else ""
+            pct = float(row["pct_change"]) if row["pct_change"] is not None else 0
 
-            category_text = f" ({category})" if category else ""
             st.markdown(
-                f"- **{product}**{category_text} increased by **{pct_change:.1f}%** compared to the previous observed period."
+                f"""
+                **{product}**  
+                <span style="color:#bfbfbf;">{category}</span>
+                <span style="float:right;"><b>+{pct:.1f}%</b></span>
+                """,
+                unsafe_allow_html=True,
             )
+            st.markdown("<br>", unsafe_allow_html=True)
 
-with right_insight:
-    st.markdown("## Quick Price Drops")
+with mid_col:
+    st.markdown("### Price drops   ↓ top movers")
 
     if decliners_df.empty:
-        st.warning("No decline insights available yet.")
+        st.info("No decliner data available.")
     else:
         for _, row in decliners_df.iterrows():
             product = row["standardized_product_name"]
-            category = row["category_name"]
-            pct_change = row["pct_change"]
+            category = row["category_name"] if row["category_name"] else ""
+            pct = float(row["pct_change"]) if row["pct_change"] is not None else 0
 
-            category_text = f" ({category})" if category else ""
             st.markdown(
-                f"- **{product}**{category_text} decreased by **{abs(pct_change):.1f}%** compared to the previous observed period."
+                f"""
+                **{product}**  
+                <span style="color:#bfbfbf;">{category}</span>
+                <span style="float:right;"><b>{pct:.1f}%</b></span>
+                """,
+                unsafe_allow_html=True,
             )
-# -----------------------------
-# Two-column explanation area
-# -----------------------------
-left, right = st.columns(2)
+            st.markdown("<br>", unsafe_allow_html=True)
 
-with left:
-    st.markdown("## What this project does")
-    st.markdown(
-        """
-- Collects supermarket price observations
-- Standardizes units and product names
-- Builds analytics-ready fact and mart layers
-- Detects volatile / anomalous products
-- Monitors pipeline health and data quality
-"""
-    )
+with right_col:
+    st.markdown("### Recent price trends")
 
-with right:
-    st.markdown("## Why it matters")
-    st.markdown(
-        """
-- Identifies sudden food price increases
-- Monitors product-level pricing movements
-- Detects unstable / volatile items
-- Provides reliable analytics-ready data
-- Supports future forecasting and alerting workflows
-"""
-    )
+    if trends_df.empty:
+        st.info("No trend data available.")
+    else:
+        trend_products = trends_df["standardized_product_name"].dropna().unique().tolist()
 
-# -----------------------------
-# Navigation helper
-# -----------------------------
-st.success("Use the left sidebar to explore Trend Analysis, Top Movers, Anomalies, and Pipeline Health.")
+        for product in trend_products:
+            product_df = trends_df[trends_df["standardized_product_name"] == product].copy()
+            product_df = product_df.sort_values("date")
+
+            latest_price = float(product_df["avg_price"].iloc[-1])
+            first_price = float(product_df["avg_price"].iloc[0])
+
+            if first_price != 0:
+                pct_change = ((latest_price - first_price) / first_price) * 100
+            else:
+                pct_change = 0
+
+            spark_fig = go.Figure()
+            spark_fig.add_trace(
+                go.Scatter(
+                    x=product_df["date"],
+                    y=product_df["avg_price"],
+                    mode="lines",
+                    line=dict(
+                        color="#63e6be" if pct_change > 0 else "#ff8c8c",
+                        width=2,
+                    ),
+                    fill="tozeroy",
+                )
+            )
+
+            spark_fig.update_layout(
+                margin=dict(l=0, r=0, t=0, b=0),
+                height=60,
+                xaxis=dict(visible=False),
+                yaxis=dict(visible=False),
+                showlegend=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+            )
+
+            row1, row2, row3 = st.columns([1.1, 1.4, 0.8])
+
+            with row1:
+                st.markdown(f"**{product}**")
+
+            with row2:
+                st.plotly_chart(spark_fig, use_container_width=True, config={"displayModeBar": False})
+
+            with row3:
+                sign = "+" if pct_change > 0 else ""
+                st.markdown(f"₺{latest_price:.1f}  \n**{sign}{pct_change:.1f}%**")
+
+
