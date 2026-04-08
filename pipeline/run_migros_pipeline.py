@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from scraper.migros.categories import get_migros_category_products
 from pipeline.marts import refresh_materialized_views
+from pipeline.quality import log_quality_check
 from pipeline.run_lifecycle import start_run, finish_run, fail_run
 
 from pipeline.transforms import transform_product
@@ -42,27 +43,7 @@ def get_connection():
     return psycopg2.connect(database_url)
 
 
-# ---------------------------------------------------------------------------
-# Run lifecycle
-# ---------------------------------------------------------------------------
 
-def log_quality_check(
-    cursor,
-    run_id: int,
-    check_name: str,
-    check_status: str,
-    observed_value: float | int | None = None,
-    threshold_value: float | int | None = None,
-    details: str | None = None,
-):
-    cursor.execute(
-        """
-        insert into ops_data_quality_results
-            (run_id, check_name, check_status, observed_value, threshold_value, details)
-        values (%s, %s, %s, %s, %s, %s)
-        """,
-        (run_id, check_name, check_status, observed_value, threshold_value, details),
-    )
 
 # ---------------------------------------------------------------------------
 # Insert helpers
