@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 from scraper.migros.categories import get_migros_category_products
 
+from pipeline.run_lifecycle import start_run, finish_run, fail_run
+
 from pipeline.transforms import transform_product
 
 load_dotenv()
@@ -43,63 +45,7 @@ def get_connection():
 # ---------------------------------------------------------------------------
 # Run lifecycle
 # ---------------------------------------------------------------------------
-def start_run(cursor, category_slug: str) -> int:
-    cursor.execute(
-        """
-        INSERT INTO scrape_runs (
-            source_name,
-            category_slug,
-            status,
-            triggered_by,
-            pipeline_version
-        )
-        VALUES (%s, %s, 'running', %s, %s)
-        RETURNING run_id
-        """,
-        (
-            SOURCE_NAME,
-            category_slug,
-            "github_actions",
-            "v2-prep-001",
-        ),
-    )
-    run_id = cursor.fetchone()[0]
-    logger.info("Run started — run_id=%s  category=%s", run_id, category_slug)
-    return run_id
 
-def finish_run(
-    cursor,
-    run_id: int,
-    records_scraped: int,
-    records_raw: int,
-    records_stg: int,
-    records_fact: int,
-    records_suspicious: int,
-    records_failed: int,
-):
-    cursor.execute(
-        """
-        UPDATE scrape_runs
-        SET finished_at = NOW(),
-            status = 'success',
-            records_scraped = %s,
-            records_raw = %s,
-            records_stg = %s,
-            records_fact = %s,
-            records_suspicious = %s,
-            records_failed = %s
-        WHERE run_id = %s
-        """,
-        (
-            records_scraped,
-            records_raw,
-            records_stg,
-            records_fact,
-            records_suspicious,
-            records_failed,
-            run_id,
-        ),
-    )
 
 def refresh_materialized_views(cursor):
     cursor.execute("REFRESH MATERIALIZED VIEW mart_daily_prices")
@@ -107,18 +53,7 @@ def refresh_materialized_views(cursor):
     cursor.execute("REFRESH MATERIALIZED VIEW mart_price_anomalies")
     cursor.execute("REFRESH MATERIALIZED VIEW mart_pipeline_health")
 
-def fail_run(cursor, run_id: int, error_message: str):
-    cursor.execute(
-        """
-        UPDATE scrape_runs
-        SET finished_at = NOW(),
-            status = 'failed',
-            error_message = %s
-        WHERE run_id = %s
-        """,
-        (error_message[:5000], run_id),
-    )
-    logger.error("Run failed — run_id=%s  error=%s", run_id, error_message[:200])
+
 
 def log_quality_check(
     cursor,
@@ -584,7 +519,13 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
         conn = get_connection()
 
         with conn.cursor() as cur:
-            run_id = start_run(cur, category_slug)
+            run_id = start_run(
+                cur,
+                source_name=SOURCE_NAME,
+                category_slug=category_slug,
+                triggered_by="github_actions",
+                pipeline_version="v2-prep-001",
+            )
             conn.commit()
 
         scraped_products = get_migros_category_products(category_slug)
