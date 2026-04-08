@@ -19,7 +19,7 @@ from pipeline.loaders_staging import (
 )
 
 from pipeline.transforms import transform_product
-from pipeline.loaders_fact import can_insert_to_fact, insert_fact_observation
+from pipeline.loaders_fact import insert_fact_observation
 
 load_dotenv()
 
