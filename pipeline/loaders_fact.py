@@ -1,0 +1,111 @@
+import logging
+from typing import Any
+
+logger = logging.getLogger(__name__)
+
+
+def can_insert_to_fact(transformed: dict[str, Any]) -> tuple[bool, str | None]:
+    if transformed.get("is_suspicious"):
+        return False, "suspicious_record"
+
+    required_fields = {
+        "price": transformed.get("price"),
+        "normalized_unit": transformed.get("normalized_unit"),
+        "normalized_quantity": transformed.get("normalized_quantity"),
+        "price_per_unit": transformed.get("price_per_unit"),
+        "standardized_product_name": transformed.get("standardized_product_name"),
+        "category_name": transformed.get("category_name"),
+    }
+
+    for field_name, value in required_fields.items():
+        if value is None:
+            return False, f"missing_{field_name}"
+
+    if transformed["price"] <= 0:
+        return False, "invalid_price"
+
+    if transformed["normalized_quantity"] <= 0:
+        return False, "invalid_normalized_quantity"
+
+    return True, None
+
+
+def insert_fact_observation(
+    cursor,
+    observation_id: int,
+    run_id: int,
+    product: dict[str, Any],
+    transformed: dict[str, Any],
+    product_id: int,
+    source_name: str,
+) -> bool:
+    can_insert, reason = can_insert_to_fact(transformed)
+
+    if not can_insert:
+        logger.info(
+            "Skipping fact insert — product=%r reason=%s",
+            product.get("product_name"),
+            reason,
+        )
+        return False
+
+    observed_at = product.get("scraped_at")
+    if observed_at is None:
+        cursor.execute("SELECT NOW()")
+        observed_at = cursor.fetchone()[0]
+
+    source_product_id = (
+        str(product["product_id"]) if product.get("product_id") is not None else None
+    )
+
+    cursor.execute(
+        """
+        INSERT INTO fact_price_observations (
+            observation_id,
+            run_id,
+            source_name,
+            source_product_id,
+            product_id,
+            product_name,
+            standardized_product_name,
+            product_url,
+            price,
+            regular_price,
+            discount_rate,
+            currency,
+            normalized_unit,
+            normalized_quantity,
+            price_per_unit,
+            unit_price_label,
+            brand_name,
+            category_name,
+            observed_at
+        )
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (source_name, source_product_id, observed_at)
+        DO NOTHING
+        """,
+        (
+            observation_id,
+            run_id,
+            source_name,
+            source_product_id,
+            product_id,
+            product.get("product_name"),
+            transformed["standardized_product_name"],
+            product.get("product_url"),
+            transformed["price"],
+            transformed["regular_price"],
+            transformed["discount_rate"],
+            transformed["currency"],
+            transformed["normalized_unit"],
+            transformed["normalized_quantity"],
+            transformed["price_per_unit"],
+            transformed["unit_price_label"],
+            transformed["brand_name"],
+            transformed["category_name"],
+            observed_at,
+        ),
+    )
+
+    return cursor.rowcount == 1
