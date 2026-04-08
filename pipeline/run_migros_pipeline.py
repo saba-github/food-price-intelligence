@@ -11,6 +11,7 @@ from scraper.migros.categories import get_migros_category_products
 from pipeline.marts import refresh_materialized_views
 from pipeline.quality import log_quality_check
 from pipeline.run_lifecycle import start_run, finish_run, fail_run
+from pipeline.dimensions import get_or_create_product_id
 
 from pipeline.transforms import transform_product
 
@@ -438,47 +439,6 @@ def process_product(
 
     finally:
         cursor.close()
-
-def get_or_create_product_id(
-    cursor,
-    standardized_product_name: str,
-    category_name: str | None,
-) -> int:
-    if not standardized_product_name:
-        raise ValueError("standardized_product_name cannot be empty")
-    # önce var mı bak
-    cursor.execute(
-        """
-        SELECT product_id
-        FROM dim_products
-        WHERE standardized_product_name = %s
-        """,
-        (standardized_product_name,),
-    )
-    row = cursor.fetchone()
-
-    if row:
-        return row[0]
-
-    # yoksa insert et
-    cursor.execute(
-        """
-        INSERT INTO dim_products (
-            standardized_product_name,
-            canonical_name,
-            category_level_1
-        )
-        VALUES (%s, %s, %s)
-        RETURNING product_id
-        """,
-        (
-            standardized_product_name,
-            standardized_product_name,
-            category_name,
-        ),
-    )
-
-    return cursor.fetchone()[0]
 
 # ---------------------------------------------------------------------------
 # Main pipeline
