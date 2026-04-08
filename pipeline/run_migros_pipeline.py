@@ -8,7 +8,7 @@ import psycopg2.extras
 from dotenv import load_dotenv
 
 from scraper.migros.categories import get_migros_category_products
-
+from pipeline.marts import refresh_materialized_views
 from pipeline.run_lifecycle import start_run, finish_run, fail_run
 
 from pipeline.transforms import transform_product
@@ -45,15 +45,6 @@ def get_connection():
 # ---------------------------------------------------------------------------
 # Run lifecycle
 # ---------------------------------------------------------------------------
-
-
-def refresh_materialized_views(cursor):
-    cursor.execute("REFRESH MATERIALIZED VIEW mart_daily_prices")
-    cursor.execute("REFRESH MATERIALIZED VIEW mart_top_movers")
-    cursor.execute("REFRESH MATERIALIZED VIEW mart_price_anomalies")
-    cursor.execute("REFRESH MATERIALIZED VIEW mart_pipeline_health")
-
-
 
 def log_quality_check(
     cursor,
