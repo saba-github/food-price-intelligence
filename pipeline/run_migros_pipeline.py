@@ -11,6 +11,7 @@ from pipeline.marts import refresh_materialized_views
 from pipeline.quality import log_quality_check
 from pipeline.run_lifecycle import start_run, finish_run, fail_run
 from pipeline.dimensions import get_or_create_product_id
+from pipeline.db import get_connection
 
 from pipeline.loaders_staging import (
     insert_stg_source_product,
@@ -40,23 +41,7 @@ SOURCE_NAME = "migros"
 CURRENCY = "TRY"
 
 
-# ---------------------------------------------------------------------------
-# DB connection
-# ---------------------------------------------------------------------------
-def get_connection():
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        raise ValueError("DATABASE_URL environment variable is not set.")
-    return psycopg2.connect(database_url)
 
-
-
-
-# ---------------------------------------------------------------------------
-# Insert helpers
-# ---------------------------------------------------------------------------
-
- 
 # ---------------------------------------------------------------------------
 # Per-product insert (kendi transaction'ı var)
 # ---------------------------------------------------------------------------
