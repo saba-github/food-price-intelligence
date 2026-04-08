@@ -298,7 +298,14 @@ def process_product(
 
     try:
         # 1️⃣ RAW
-        event_id = insert_raw_event(cursor, run_id, product, category_slug)
+        event_id = insert_raw_event(
+            cursor,
+            run_id,
+            product,
+            category_slug,
+            source_name=SOURCE_NAME,
+            currency=CURRENCY,
+        )
 
         # 2️⃣ STG SOURCE
         insert_stg_source_product(cursor, event_id, run_id, product)
