@@ -401,6 +401,7 @@ left_col, right_col = st.columns(2)
 with left_col:
     st.markdown('<div class="panel-card">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Top 10 Most Expensive Products</div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel-subtitle">Highest average prices on the selected date</div>', unsafe_allow_html=True)
 
     if expensive_df is None or expensive_df.empty:
         st.markdown('<div class="empty-state">No expensive-product data available.</div>', unsafe_allow_html=True)
@@ -427,6 +428,7 @@ with left_col:
 with right_col:
     st.markdown('<div class="panel-card">', unsafe_allow_html=True)
     st.markdown('<div class="panel-title">Top 10 Cheapest Products</div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel-subtitle">Lowest average prices on the selected date</div>', unsafe_allow_html=True)
 
     if cheap_df is None or cheap_df.empty:
         st.markdown('<div class="empty-state">No cheapest-product data available.</div>', unsafe_allow_html=True)
