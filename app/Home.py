@@ -567,6 +567,7 @@ health_status = latest_run["pipeline_health_status"] if latest_run is not None e
 run_id = latest_run["run_id"] if latest_run is not None else "-"
 latest_date_str = format_date_badge(latest_date) if latest_date is not None else "No data"
 
+# HEADER
 st.markdown(
     f"""
     <div class="hero-card">
@@ -575,18 +576,25 @@ st.markdown(
         <div class="hero-subtitle">
             Retail price tracking & pipeline monitoring — {latest_date_str}
         </div>
-
-        <div class="badge-row">
-            <div class="badge badge-green">{health_status}</div>
-            <div class="badge badge-blue">Run #{run_id}</div>
-            <div class="badge badge-dark">{latest_date_str}</div>
-        </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
-    
 
+# BADGES (AYRI)
+left_head, right_head = st.columns([4, 1])
+
+with right_head:
+    st.markdown(
+        f"""
+        <div class="top-badges">
+            <div class="badge badge-health">{health_status}</div>
+            <div class="badge badge-run">Run #{run_id}</div>
+            <div class="badge badge-date">{latest_date_str}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 nav1, nav2, nav3, nav4, nav5 = st.columns(5)
 
 with nav1:
