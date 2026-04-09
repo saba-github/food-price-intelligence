@@ -281,6 +281,13 @@ st.markdown("""
         color: #b5bcc8;
     }
 
+    .item-meta {
+        font-size: 0.78rem;
+        color: #94a3b8;
+        margin-top: 0.28rem;
+        line-height: 1.3;
+    }
+
     .item-change-up {
         color: #22c55e;
         font-weight: 800;
@@ -405,6 +412,14 @@ def format_health_status(value):
         return "Unknown"
     return str(value).replace("_", " ").title()
 
+def format_short_date(value):
+    if value is None:
+        return "-"
+    try:
+        return value.strftime("%b %d").replace(" 0", " ")
+    except Exception:
+        return str(value)
+        
 def metric_card(label, value, subtext="", is_health=False):
     if is_health:
         value_html = f'<div class="health-pill">{value}</div>'
@@ -608,6 +623,9 @@ with left_col:
             product = row["standardized_product_name"]
             category = row["category_name"] if row["category_name"] else "Unknown"
             pct_change = safe_float(row["pct_change"])
+            previous_price = safe_float(row["previous_price"])
+            latest_price = safe_float(row["latest_price"])
+            change_date = format_short_date(row["date"])
 
             st.markdown(
                 f"""
@@ -616,6 +634,7 @@ with left_col:
                         <div>
                             <div class="item-title">{product}</div>
                             <div class="item-sub">{category}</div>
+                            <div class="item-meta">₺{previous_price:.1f} → ₺{latest_price:.1f} · {change_date}</div>
                         </div>
                         <div class="item-change-up">+{pct_change:.1f}%</div>
                     </div>
@@ -623,7 +642,6 @@ with left_col:
                 """,
                 unsafe_allow_html=True,
             )
-
     st.markdown('</div>', unsafe_allow_html=True)
 
 with mid_col:
@@ -640,6 +658,9 @@ with mid_col:
             product = row["standardized_product_name"]
             category = row["category_name"] if row["category_name"] else "Unknown"
             pct_change = safe_float(row["pct_change"])
+            previous_price = safe_float(row["previous_price"])
+            latest_price = safe_float(row["latest_price"])
+            change_date = format_short_date(row["date"])
 
             st.markdown(
                 f"""
@@ -648,6 +669,7 @@ with mid_col:
                         <div>
                             <div class="item-title">{product}</div>
                             <div class="item-sub">{category}</div>
+                            <div class="item-meta">₺{previous_price:.1f} → ₺{latest_price:.1f} · {change_date}</div>
                         </div>
                         <div class="item-change-down">{pct_change:.1f}%</div>
                     </div>
@@ -655,7 +677,6 @@ with mid_col:
                 """,
                 unsafe_allow_html=True,
             )
-
     st.markdown('</div>', unsafe_allow_html=True)
 
 with right_col:

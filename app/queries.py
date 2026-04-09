@@ -63,6 +63,8 @@ HOME_TOP_MOVER_CARD_QUERY = """
 select
     standardized_product_name,
     category_name,
+    date,
+    previous_price,
     latest_price,
     pct_change
 from mart_top_movers
@@ -75,6 +77,8 @@ HOME_TOP_DECLINER_CARD_QUERY = """
 select
     standardized_product_name,
     category_name,
+    date,
+    previous_price,
     latest_price,
     pct_change
 from mart_top_movers
