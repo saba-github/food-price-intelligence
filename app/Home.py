@@ -598,7 +598,7 @@ left_col, mid_col, right_col = st.columns([1, 1, 1.25])
 with left_col:
     st.markdown('<div class="panel-card">', unsafe_allow_html=True)
     st.markdown(
-        '<div class="panel-title"><span class="dot-green"></span>Top price increases</div>'
+        '<div class="panel-title"><span class="dot-green"></span>Top price increases</div>',
         unsafe_allow_html=True,
     )
     if movers_df.empty:
@@ -629,7 +629,7 @@ with left_col:
 with mid_col:
     st.markdown('<div class="panel-card">', unsafe_allow_html=True)
     st.markdown(
-        '<div class="panel-title"><span class="dot-red"></span>Top price drops</div>'
+        '<div class="panel-title"><span class="dot-red"></span>Top price drops</div>',
         unsafe_allow_html=True,
     )
 
