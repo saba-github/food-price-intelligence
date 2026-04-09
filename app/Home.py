@@ -342,6 +342,59 @@ st.markdown("""
         margin-top: -0.3rem;
         margin-bottom: -0.8rem;
     }
+    .hero-card {
+    background: radial-gradient(1200px 400px at 20% 0%, rgba(59,130,246,0.18), transparent 60%),
+                linear-gradient(180deg, #111315 0%, #0c0e11 100%);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 20px;
+    padding: 1.2rem 1.4rem 1.1rem 1.4rem;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    margin-bottom: 1rem;
+}
+
+.hero-eyebrow {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: #22c55e;
+    text-transform: uppercase;
+    margin-bottom: 0.25rem;
+}
+
+.hero-title {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #ffffff;
+    margin-bottom: 0.25rem;
+}
+
+.hero-subtitle {
+    font-size: 0.95rem;
+    color: #cbd5e1;
+    margin-bottom: 0.8rem;
+}
+
+.badge-row {
+    display: flex;
+    gap: 0.6rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.badge-green {
+    background: rgba(34,197,94,0.15);
+    color: #22c55e;
+}
+
+.badge-blue {
+    background: rgba(59,130,246,0.15);
+    color: #60a5fa;
+}
+
+.badge-dark {
+    background: rgba(255,255,255,0.08);
+    color: #e5e7eb;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -510,27 +563,29 @@ passed_checks = safe_int(latest_run["passed_checks"]) if latest_run is not None 
 # --------------------------------------------------
 st.markdown('<div class="app-shell">', unsafe_allow_html=True)
 
-left_head, right_head = st.columns([1.65, 1])
+health_status = latest_run["pipeline_health_status"] if latest_run is not None else "N/A"
+run_id = latest_run["run_id"] if latest_run is not None else "-"
+latest_date_str = format_date_badge(latest_date) if latest_date is not None else "No data"
 
-with left_head:
-    st.markdown('<div class="eyebrow">Migros · Price Intelligence</div>', unsafe_allow_html=True)
-    st.markdown('<div class="hero-title">Market Overview</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<div class="hero-subtitle">Retail price tracking & pipeline monitoring</div>',
-        unsafe_allow_html=True,
-    )
-
-with right_head:
-    st.markdown(
-        f"""
-        <div class="top-badges">
-            <div class="badge badge-health">{health_status}</div>
-            <div class="badge badge-run">Run #{latest_run_id if latest_run_id else "N/A"}</div>
-            <div class="badge badge-date">{format_date_badge(latest_date)}</div>
+st.markdown(
+    f"""
+    <div class="hero-card">
+        <div class="hero-eyebrow">Migros · Price Intelligence</div>
+        <div class="hero-title">Market Overview</div>
+        <div class="hero-subtitle">
+            Retail price tracking & pipeline monitoring — {latest_date_str}
         </div>
-        """,
-        unsafe_allow_html=True,
-    )
+
+        <div class="badge-row">
+            <div class="badge badge-green">{health_status}</div>
+            <div class="badge badge-blue">Run #{run_id}</div>
+            <div class="badge badge-dark">{latest_date_str}</div>
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+    
 
 nav1, nav2, nav3, nav4, nav5 = st.columns(5)
 
@@ -566,6 +621,8 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
 # --------------------------------------------------
 # KPI cards
 # --------------------------------------------------
