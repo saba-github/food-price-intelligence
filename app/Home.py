@@ -18,133 +18,311 @@ st.set_page_config(page_title="Food Price Intelligence", layout="wide")
 # --------------------------------------------------
 st.markdown("""
 <style>
+    .stApp {
+        background-color: #0b0d10;
+    }
+
     .block-container {
-        padding-top: 2rem;
+        padding-top: 1.4rem;
         padding-bottom: 2rem;
         padding-left: 2rem;
         padding-right: 2rem;
+        max-width: 1400px;
+    }
+
+    div[data-testid="stHorizontalBlock"] {
+        gap: 0.9rem;
+    }
+
+    .app-shell {
+        background: linear-gradient(180deg, #111315 0%, #0c0e11 100%);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 24px;
+        padding: 1.4rem 1.4rem 1.2rem 1.4rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.24);
+    }
+
+    .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 0.6rem;
+    }
+
+    .eyebrow {
+        color: #d4a857;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-bottom: 0.3rem;
     }
 
     .hero-title {
-        font-size: 2.6rem;
+        font-size: 2.15rem;
         font-weight: 800;
         color: #ffffff;
-        margin-bottom: 0.3rem;
+        line-height: 1.05;
+        margin: 0;
     }
 
     .hero-subtitle {
         font-size: 1rem;
-        color: #9aa4b2;
-        margin-bottom: 1.5rem;
+        color: #d1d5db;
+        margin-top: 0.35rem;
+        margin-bottom: 0;
     }
 
-    .section-card {
-        background: rgba(17, 24, 39, 0.85);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 18px;
-        padding: 20px 20px 14px 20px;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-        margin-bottom: 18px;
+    .top-badges {
+        display: flex;
+        justify-content: flex-end;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+        margin-top: 0.15rem;
+    }
+
+    .badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0.42rem 0.8rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: #171a1f;
+        color: #f3f4f6;
+        white-space: nowrap;
+    }
+
+    .badge-health {
+        background: #e8fff6;
+        color: #0f8b62;
+        border: 1px solid rgba(16,185,129,0.25);
+    }
+
+    .badge-run {
+        background: #eef4ff;
+        color: #2563eb;
+        border: 1px solid rgba(37,99,235,0.15);
+    }
+
+    .badge-date {
+        background: #1a1d22;
+        color: #e5e7eb;
+        border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .nav-row {
+        display: flex;
+        gap: 2rem;
+        align-items: center;
+        border-bottom: 1px solid rgba(255,255,255,0.10);
+        padding-top: 1.15rem;
+        padding-bottom: 0.85rem;
+        margin-bottom: 1rem;
+        overflow-x: auto;
+    }
+
+    .nav-item {
+        color: #f3f4f6;
+        font-size: 0.95rem;
+        font-weight: 650;
+        white-space: nowrap;
+        opacity: 0.92;
+    }
+
+    .nav-item-active {
+        position: relative;
+    }
+
+    .nav-item-active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.87rem;
+        width: 100%;
+        height: 2px;
+        background: #ffffff;
+        border-radius: 999px;
     }
 
     .metric-card {
-        background: linear-gradient(180deg, rgba(17,24,39,0.95), rgba(10,15,30,0.95));
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 18px;
-        padding: 18px 18px 14px 18px;
-        min-height: 115px;
-        box-shadow: 0 10px 24px rgba(0,0,0,0.20);
+        background: linear-gradient(180deg, #262626 0%, #222222 100%);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
+        padding: 1rem 1rem 0.9rem 1rem;
+        min-height: 132px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
     }
 
     .metric-label {
-        font-size: 0.9rem;
-        color: #9aa4b2;
-        margin-bottom: 10px;
-        font-weight: 500;
+        font-size: 0.78rem;
+        color: #b8bfc9;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        margin-bottom: 0.7rem;
     }
 
     .metric-value {
         font-size: 2rem;
         font-weight: 800;
         color: #ffffff;
-        line-height: 1.1;
+        line-height: 1;
+        margin-bottom: 0.45rem;
     }
 
     .metric-sub {
-        margin-top: 8px;
-        font-size: 0.82rem;
-        color: #7dd3fc;
+        font-size: 0.9rem;
+        color: #d1d5db;
+        line-height: 1.3;
     }
 
-    .section-title {
-        font-size: 1.45rem;
-        font-weight: 750;
-        color: #ffffff;
-        margin-bottom: 14px;
+    .health-pill {
+        display: inline-block;
+        padding: 0.24rem 0.72rem;
+        border-radius: 999px;
+        font-size: 0.95rem;
+        font-weight: 800;
+        background: #eafff4;
+        color: #0f8b62;
+        border: 1px solid rgba(16,185,129,0.22);
+        margin-bottom: 0.4rem;
     }
+
+    .health-banner {
+        background: #dff3ea;
+        border: 1px solid rgba(16,185,129,0.16);
+        border-radius: 14px;
+        padding: 0.95rem 1rem;
+        color: #0f3d30;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+        font-size: 0.98rem;
+        font-weight: 650;
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+    }
+
+    .health-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 999px;
+        background: #1aa56b;
+        flex-shrink: 0;
+    }
+
+    .panel-card {
+        background: linear-gradient(180deg, #262626 0%, #222222 100%);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 18px;
+        padding: 1rem;
+        min-height: 100%;
+    }
+
+    .panel-title {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #ffffff;
+        margin-bottom: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+    }
+
+    .dot-green, .dot-red, .dot-blue {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        display: inline-block;
+        flex-shrink: 0;
+    }
+
+    .dot-green { background: #22c55e; }
+    .dot-red { background: #ef4444; }
+    .dot-blue { background: #3b82f6; }
 
     .item-card {
         background: rgba(255,255,255,0.02);
-        border: 1px solid rgba(255,255,255,0.05);
-        border-radius: 14px;
-        padding: 14px 14px 10px 14px;
-        margin-bottom: 12px;
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 12px;
+        padding: 0.85rem 0.85rem 0.75rem 0.85rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .item-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.8rem;
     }
 
     .item-title {
         font-size: 1rem;
-        font-weight: 700;
+        font-weight: 750;
         color: #ffffff;
-        margin-bottom: 4px;
+        line-height: 1.15;
+        margin-bottom: 0.2rem;
     }
 
     .item-sub {
-        font-size: 0.85rem;
-        color: #94a3b8;
+        font-size: 0.86rem;
+        color: #b5bcc8;
     }
 
     .item-change-up {
-        float: right;
         color: #22c55e;
-        font-weight: 700;
+        font-weight: 800;
+        font-size: 0.98rem;
+        white-space: nowrap;
     }
 
     .item-change-down {
-        float: right;
         color: #ef4444;
-        font-weight: 700;
+        font-weight: 800;
+        font-size: 0.98rem;
+        white-space: nowrap;
     }
 
-    .health-banner {
-        background: linear-gradient(90deg, rgba(22,101,52,0.95), rgba(21,128,61,0.75));
-        border: 1px solid rgba(34,197,94,0.25);
-        color: #ecfdf5;
-        padding: 14px 16px;
-        border-radius: 14px;
-        font-weight: 600;
-        margin-top: 10px;
-        margin-bottom: 20px;
+    .trend-meta {
+        text-align: right;
+        min-width: 84px;
     }
 
     .trend-price {
-        font-size: 0.95rem;
-        font-weight: 700;
-        color: white;
-        text-align: right;
+        font-size: 0.98rem;
+        font-weight: 800;
+        color: #ffffff;
+        line-height: 1.1;
     }
 
     .trend-change-up {
         color: #22c55e;
-        font-weight: 700;
-        text-align: right;
+        font-weight: 800;
         font-size: 0.9rem;
+        margin-top: 0.22rem;
     }
 
     .trend-change-down {
         color: #ef4444;
-        font-weight: 700;
-        text-align: right;
+        font-weight: 800;
         font-size: 0.9rem;
+        margin-top: 0.22rem;
+    }
+
+    .empty-state {
+        color: #cbd5e1;
+        font-size: 0.95rem;
+        padding: 0.4rem 0.1rem;
+    }
+
+    [data-testid="stPlotlyChart"] {
+        margin-top: -0.3rem;
+        margin-bottom: -0.8rem;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -200,12 +378,33 @@ def safe_float(value, default=0.0):
     except (TypeError, ValueError):
         return default
 
-def metric_card(label, value, subtext=""):
+def format_date_badge(value):
+    if value is None:
+        return "No date"
+    try:
+        return value.strftime("%b %-d, %Y")
+    except Exception:
+        try:
+            return value.strftime("%b %d, %Y").replace(" 0", " ")
+        except Exception:
+            return str(value)
+
+def format_health_status(value):
+    if not value:
+        return "Unknown"
+    return str(value).replace("_", " ").title()
+
+def metric_card(label, value, subtext="", is_health=False):
+    if is_health:
+        value_html = f'<div class="health-pill">{value}</div>'
+    else:
+        value_html = f'<div class="metric-value">{value}</div>'
+
     st.markdown(
         f"""
         <div class="metric-card">
             <div class="metric-label">{label}</div>
-            <div class="metric-value">{value}</div>
+            {value_html}
             <div class="metric-sub">{subtext}</div>
         </div>
         """,
@@ -221,16 +420,17 @@ def build_sparkline(product_df, pct_change):
             mode="lines",
             line=dict(
                 color="#22c55e" if pct_change >= 0 else "#ef4444",
-                width=2.5,
+                width=2.2,
             ),
-            fill="tozeroy",
+            hoverinfo="skip",
         )
     )
+
     fig.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
-        height=70,
-        xaxis=dict(visible=False),
-        yaxis=dict(visible=False),
+        height=52,
+        xaxis=dict(visible=False, fixedrange=True),
+        yaxis=dict(visible=False, fixedrange=True),
         showlegend=False,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -273,17 +473,52 @@ if not latest_run_df.empty:
 if not latest_date_df.empty:
     latest_date = latest_date_df.iloc[0]["latest_date"]
 
+latest_run_id = safe_int(latest_run["run_id"]) if latest_run is not None else None
+health_status = format_health_status(
+    latest_run["pipeline_health_status"] if latest_run is not None else None
+)
+total_checks = safe_int(latest_run["total_checks"]) if latest_run is not None else 0
+passed_checks = safe_int(latest_run["passed_checks"]) if latest_run is not None else 0
+
 # --------------------------------------------------
-# Hero
+# Header shell
 # --------------------------------------------------
-st.markdown('<div class="hero-title">Food Price Intelligence System</div>', unsafe_allow_html=True)
+st.markdown('<div class="app-shell">', unsafe_allow_html=True)
+
+left_head, right_head = st.columns([1.65, 1])
+
+with left_head:
+    st.markdown('<div class="eyebrow">Migros · Price Intelligence</div>', unsafe_allow_html=True)
+    st.markdown('<div class="hero-title">Market Overview</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="hero-subtitle">Retail price tracking & pipeline monitoring</div>',
+        unsafe_allow_html=True,
+    )
+
+with right_head:
+    st.markdown(
+        f"""
+        <div class="top-badges">
+            <div class="badge badge-health">{health_status}</div>
+            <div class="badge badge-run">Run #{latest_run_id if latest_run_id else "N/A"}</div>
+            <div class="badge badge-date">{format_date_badge(latest_date)}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 st.markdown(
-    '<div class="hero-subtitle">Monitor retail price movements with a production-style analytics and pipeline monitoring dashboard.</div>',
+    """
+    <div class="nav-row">
+        <div class="nav-item nav-item-active">Overview</div>
+        <div class="nav-item">Trend analysis</div>
+        <div class="nav-item">Top movers</div>
+        <div class="nav-item">Anomalies</div>
+        <div class="nav-item">Pipeline health</div>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
-
-if latest_date is not None:
-    st.caption(f"Latest analytics date: {latest_date}")
 
 # --------------------------------------------------
 # KPI cards
@@ -291,44 +526,74 @@ if latest_date is not None:
 k1, k2, k3, k4, k5 = st.columns(5)
 
 with k1:
-    metric_card("Products", f"{product_count if product_count is not None else 'N/A'}", "Tracked distinct products")
+    metric_card(
+        "Products",
+        f"{product_count if product_count is not None else 'N/A'}",
+        "Distinct tracked items",
+    )
 
 with k2:
-    metric_card("Observations", f"{observation_count if observation_count is not None else 'N/A'}", "Price observations collected")
+    metric_card(
+        "Observations",
+        f"{observation_count if observation_count is not None else 'N/A'}",
+        "Price data points",
+    )
 
 with k3:
-    metric_card("Avg Price / Unit", f"₺{avg_price_per_unit:.2f}" if avg_price_per_unit is not None else "N/A", "Average unit-normalized price")
+    metric_card(
+        "Avg Price / Unit",
+        f"₺{avg_price_per_unit:.2f}" if avg_price_per_unit is not None else "N/A",
+        "Across trusted observations",
+    )
 
 with k4:
-    metric_card("Total Runs", f"{total_runs if total_runs is not None else 'N/A'}", "Pipeline executions")
+    metric_card(
+        "Total Runs",
+        f"{total_runs if total_runs is not None else 'N/A'}",
+        "Pipeline executions",
+    )
 
 with k5:
-    run_health = latest_run["pipeline_health_status"] if latest_run is not None else "N/A"
-    metric_card("Latest Run Health", f"{run_health}", "Most recent pipeline status")
+    metric_card(
+        "Latest Run Health",
+        health_status,
+        f"{passed_checks}/{total_checks} checks passed" if total_checks else "Most recent pipeline status",
+        is_health=True,
+    )
 
+# --------------------------------------------------
+# Health banner
+# --------------------------------------------------
 if latest_run is not None:
-    total_checks = safe_int(latest_run["total_checks"])
-    passed_checks = safe_int(latest_run["passed_checks"])
+    banner_status_text = "completed successfully" if passed_checks == total_checks and total_checks > 0 else "completed"
     st.markdown(
         f"""
         <div class="health-banner">
-            Latest pipeline run <b>#{latest_run['run_id']}</b> completed successfully with
-            <b>{passed_checks}/{total_checks}</b> checks passed.
+            <span class="health-dot"></span>
+            <span>Latest pipeline run</span>
+            <strong>#{latest_run_id}</strong>
+            <span>{banner_status_text} — </span>
+            <strong>{passed_checks}/{total_checks}</strong>
+            <span>quality checks passed. Materialized views refreshed.</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 # --------------------------------------------------
-# Main sections
+# Main content
 # --------------------------------------------------
 left_col, mid_col, right_col = st.columns([1, 1, 1.25])
 
 with left_col:
-    st.markdown('<div class="section-title">Price increases ↑</div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="panel-title"><span class="dot-green"></span>Price increases</div>',
+        unsafe_allow_html=True,
+    )
 
     if movers_df.empty:
-        st.info("No mover data available.")
+        st.markdown('<div class="empty-state">No mover data available.</div>', unsafe_allow_html=True)
     else:
         for _, row in movers_df.iterrows():
             product = row["standardized_product_name"]
@@ -338,21 +603,29 @@ with left_col:
             st.markdown(
                 f"""
                 <div class="item-card">
-                    <div class="item-title">
-                        {product}
-                        <span class="item-change-up">+{pct_change:.1f}%</span>
+                    <div class="item-row">
+                        <div>
+                            <div class="item-title">{product}</div>
+                            <div class="item-sub">{category}</div>
+                        </div>
+                        <div class="item-change-up">+{pct_change:.1f}%</div>
                     </div>
-                    <div class="item-sub">{category}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
 with mid_col:
-    st.markdown('<div class="section-title">Price drops ↓</div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="panel-title"><span class="dot-red"></span>Price drops</div>',
+        unsafe_allow_html=True,
+    )
 
     if decliners_df.empty:
-        st.info("No decliner data available.")
+        st.markdown('<div class="empty-state">No decliner data available.</div>', unsafe_allow_html=True)
     else:
         for _, row in decliners_df.iterrows():
             product = row["standardized_product_name"]
@@ -362,21 +635,29 @@ with mid_col:
             st.markdown(
                 f"""
                 <div class="item-card">
-                    <div class="item-title">
-                        {product}
-                        <span class="item-change-down">{pct_change:.1f}%</span>
+                    <div class="item-row">
+                        <div>
+                            <div class="item-title">{product}</div>
+                            <div class="item-sub">{category}</div>
+                        </div>
+                        <div class="item-change-down">{pct_change:.1f}%</div>
                     </div>
-                    <div class="item-sub">{category}</div>
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
 
+    st.markdown('</div>', unsafe_allow_html=True)
+
 with right_col:
-    st.markdown('<div class="section-title">Recent price trends</div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="panel-title"><span class="dot-blue"></span>Recent price trends</div>',
+        unsafe_allow_html=True,
+    )
 
     if trends_df.empty:
-        st.info("No trend data available.")
+        st.markdown('<div class="empty-state">No trend data available.</div>', unsafe_allow_html=True)
     else:
         trend_products = trends_df["standardized_product_name"].dropna().unique().tolist()
 
@@ -389,15 +670,14 @@ with right_col:
 
             first_price = safe_float(product_df["avg_price"].iloc[0])
             latest_price = safe_float(product_df["avg_price"].iloc[-1])
-
             pct_change = ((latest_price - first_price) / first_price * 100) if first_price != 0 else 0.0
             spark_fig = build_sparkline(product_df, pct_change)
 
             st.markdown('<div class="item-card">', unsafe_allow_html=True)
-            a, b, c = st.columns([1.05, 1.5, 0.7])
+            a, b, c = st.columns([1.2, 1.35, 0.75])
 
             with a:
-                st.markdown(f"**{product}**")
+                st.markdown(f'<div class="item-title">{product}</div>', unsafe_allow_html=True)
 
             with b:
                 st.plotly_chart(
@@ -409,7 +689,18 @@ with right_col:
             with c:
                 trend_class = "trend-change-up" if pct_change >= 0 else "trend-change-down"
                 sign = "+" if pct_change >= 0 else ""
-                st.markdown(f'<div class="trend-price">₺{latest_price:.1f}</div>', unsafe_allow_html=True)
-                st.markdown(f'<div class="{trend_class}">{sign}{pct_change:.1f}%</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f"""
+                    <div class="trend-meta">
+                        <div class="trend-price">₺{latest_price:.1f}</div>
+                        <div class="{trend_class}">{sign}{pct_change:.1f}%</div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
             st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
