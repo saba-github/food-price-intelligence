@@ -107,10 +107,9 @@ st.markdown("""
         background: linear-gradient(180deg, #262626 0%, #222222 100%);
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 16px;
-        padding: 0.9rem 1rem 1rem 1rem;
-        min-height: 110px;
+        padding: 0.85rem 1rem 0.85rem 1rem;
+        min-height: 88px;
     }
-
     .filter-label {
         font-size: 0.78rem;
         color: #b8bfc9;
@@ -339,18 +338,19 @@ with left_col:
         st.markdown('<div class="empty-state">No expensive-product data available.</div>', unsafe_allow_html=True)
     else:
         fig_expensive = px.bar(
-            expensive_df,
-            x="standardized_product_name",
-            y="avg_price",
+            expensive_df.sort_values("avg_price", ascending=True),
+            x="avg_price",
+            y="standardized_product_name",
             hover_data=["category_name"],
+            orientation="h",
         )
         fig_expensive.update_layout(
             height=420,
             margin=dict(l=10, r=10, t=10, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="",
-            yaxis_title="Price",
+            xaxis_title="Price",
+            yaxis_title="",
             font=dict(color="white"),
         )
         st.plotly_chart(fig_expensive, use_container_width=True)
@@ -364,18 +364,19 @@ with right_col:
         st.markdown('<div class="empty-state">No cheapest-product data available.</div>', unsafe_allow_html=True)
     else:
         fig_cheap = px.bar(
-            cheap_df,
-            x="standardized_product_name",
-            y="avg_price",
+            cheap_df.sort_values("avg_price", ascending=True),
+            x="avg_price",
+            y="standardized_product_name",
             hover_data=["category_name"],
+            orientation="h",
         )
         fig_cheap.update_layout(
             height=420,
             margin=dict(l=10, r=10, t=10, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            xaxis_title="",
-            yaxis_title="Price",
+            xaxis_title="Price",
+            yaxis_title="",
             font=dict(color="white"),
         )
         st.plotly_chart(fig_cheap, use_container_width=True)
