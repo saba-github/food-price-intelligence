@@ -530,30 +530,6 @@ if product_pool:
             unsafe_allow_html=True,
         )
 
-        st.markdown(
-            f"""
-            <div class="trend-kpi-row">
-                <div class="trend-kpi">
-                    <div class="trend-kpi-label">First observed price</div>
-                    <div class="trend-kpi-value">₺{first_price:.1f}</div>
-                </div>
-                <div class="trend-kpi">
-                    <div class="trend-kpi-label">Latest price</div>
-                    <div class="trend-kpi-value">₺{latest_price:.1f}</div>
-                </div>
-                <div class="trend-kpi">
-                    <div class="trend-kpi-label">Total change</div>
-                    <div class="trend-kpi-value">{pct_change_display}</div>
-                </div>
-                <div class="trend-kpi">
-                    <div class="trend-kpi-label">Observed period</div>
-                    <div class="trend-kpi-value">{first_date} → {last_date}</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
     if trend_df.empty:
         st.markdown('<div class="empty-state">No trend data available for this product.</div>', unsafe_allow_html=True)
     else:
