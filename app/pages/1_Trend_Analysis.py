@@ -489,17 +489,46 @@ if product_pool:
     trend_df = run_query(PRICE_TREND_QUERY, {"product_name": selected_product})
 
     if not trend_df.empty:
-        first_price = pd.to_numeric(trend_df["avg_price"].iloc[0], errors="coerce")
-        latest_price = pd.to_numeric(trend_df["avg_price"].iloc[-1], errors="coerce")
+        trend_df = trend_df.copy()
+        trend_df["avg_price"] = pd.to_numeric(trend_df["avg_price"], errors="coerce")
+        trend_df = trend_df.dropna(subset=["avg_price"]).sort_values("date")
 
-        if pd.notna(first_price) and pd.notna(latest_price) and first_price != 0:
+    if not trend_df.empty:
+        first_price = float(trend_df["avg_price"].iloc[0])
+        latest_price = float(trend_df["avg_price"].iloc[-1])
+
+        if first_price != 0:
             pct_change = ((latest_price - first_price) / first_price) * 100
             pct_change_display = f"{pct_change:+.1f}%"
         else:
             pct_change_display = "N/A"
-        
+
         first_date = format_date_badge(trend_df["date"].iloc[0])
         last_date = format_date_badge(trend_df["date"].iloc[-1])
+
+        st.markdown(
+            f"""
+            <div class="trend-kpi-row">
+                <div class="trend-kpi">
+                    <div class="trend-kpi-label">First observed price</div>
+                    <div class="trend-kpi-value">₺{first_price:.1f}</div>
+                </div>
+                <div class="trend-kpi">
+                    <div class="trend-kpi-label">Latest price</div>
+                    <div class="trend-kpi-value">₺{latest_price:.1f}</div>
+                </div>
+                <div class="trend-kpi">
+                    <div class="trend-kpi-label">Total change</div>
+                    <div class="trend-kpi-value">{pct_change_display}</div>
+                </div>
+                <div class="trend-kpi">
+                    <div class="trend-kpi-label">Observed period</div>
+                    <div class="trend-kpi-value">{first_date} → {last_date}</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
         st.markdown(
             f"""
