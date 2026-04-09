@@ -21,6 +21,10 @@ st.markdown("""
     .stApp {
         background-color: #0b0d10;
     }
+    
+        [data-testid="stSidebar"] {
+        display: none;
+    }
 
     .block-container {
         padding-top: 1.4rem;
@@ -430,8 +434,8 @@ def build_sparkline(product_df, pct_change):
     )
 
     fig.update_layout(
-        margin=dict(l=0, r=0, t=6, b=6),
-        height=60,
+        margin=dict(l=0, r=0, t=8, b=8),
+        height=64,
         xaxis=dict(visible=False, fixedrange=True),
         yaxis=dict(visible=False, fixedrange=True),
         showlegend=False,
@@ -590,10 +594,9 @@ left_col, mid_col, right_col = st.columns([1, 1, 1.25])
 with left_col:
     st.markdown('<div class="panel-card">', unsafe_allow_html=True)
     st.markdown(
-        '<div class="panel-title"><span class="dot-green"></span>Price increases</div>',
+        '<div class="panel-title"><span class="dot-green"></span>Top price increases (24h)</div>',
         unsafe_allow_html=True,
     )
-
     if movers_df.empty:
         st.markdown('<div class="empty-state">No mover data available.</div>', unsafe_allow_html=True)
     else:
@@ -622,7 +625,7 @@ with left_col:
 with mid_col:
     st.markdown('<div class="panel-card">', unsafe_allow_html=True)
     st.markdown(
-        '<div class="panel-title"><span class="dot-red"></span>Price drops</div>',
+        '<div class="panel-title"><span class="dot-red"></span>Top price drops (24h)</div>',
         unsafe_allow_html=True,
     )
 
