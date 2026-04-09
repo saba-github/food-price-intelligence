@@ -413,6 +413,7 @@ with left_col:
             hover_data=["category_name"],
             orientation="h",
         )
+        fig_expensive.update_traces(marker_color="#60a5fa")
         fig_expensive.update_layout(
             height=420,
             margin=dict(l=10, r=10, t=10, b=10),
@@ -440,6 +441,7 @@ with right_col:
             hover_data=["category_name"],
             orientation="h",
         )
+        fig_cheap.update_traces(marker_color="#34d399")
         fig_cheap.update_layout(
             height=420,
             margin=dict(l=10, r=10, t=10, b=10),
