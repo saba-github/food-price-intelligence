@@ -1,5 +1,6 @@
 import streamlit as st
 import plotly.express as px
+import pandas as pd
 
 from db import run_query
 from queries import (
@@ -103,13 +104,6 @@ st.markdown("""
         border-radius: 999px;
     }
 
-    .filter-card {
-        background: linear-gradient(180deg, #262626 0%, #222222 100%);
-        border: 1px solid rgba(255,255,255,0.08);
-        border-radius: 16px;
-        padding: 0.75rem 1rem 0.8rem 1rem;
-        min-height: auto;
-    }
     .filter-label {
         font-size: 0.78rem;
         color: #b8bfc9;
@@ -495,9 +489,15 @@ if product_pool:
     trend_df = run_query(PRICE_TREND_QUERY, {"product_name": selected_product})
 
     if not trend_df.empty:
-        first_price = float(trend_df["avg_price"].iloc[0])
-        latest_price = float(trend_df["avg_price"].iloc[-1])
-        pct_change = ((latest_price - first_price) / first_price * 100) if first_price != 0 else 0.0
+        first_price = pd.to_numeric(trend_df["avg_price"].iloc[0], errors="coerce")
+        latest_price = pd.to_numeric(trend_df["avg_price"].iloc[-1], errors="coerce")
+
+        if pd.notna(first_price) and pd.notna(latest_price) and first_price != 0:
+            pct_change = ((latest_price - first_price) / first_price) * 100
+            pct_change_display = f"{pct_change:+.1f}%"
+        else:
+            pct_change_display = "N/A"
+        
         first_date = format_date_badge(trend_df["date"].iloc[0])
         last_date = format_date_badge(trend_df["date"].iloc[-1])
 
@@ -514,7 +514,7 @@ if product_pool:
                 </div>
                 <div class="trend-kpi">
                     <div class="trend-kpi-label">Total change</div>
-                    <div class="trend-kpi-value">{pct_change:+.1f}%</div>
+                    <div class="trend-kpi-value">{pct_change_display}</div>
                 </div>
                 <div class="trend-kpi">
                     <div class="trend-kpi-label">Observed period</div>
