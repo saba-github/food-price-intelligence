@@ -374,27 +374,6 @@ st.markdown("""
     margin-bottom: 0.8rem;
 }
 
-.badge-row {
-    display: flex;
-    gap: 0.6rem;
-    align-items: center;
-    flex-wrap: wrap;
-}
-
-.badge-green {
-    background: rgba(34,197,94,0.15);
-    color: #22c55e;
-}
-
-.badge-blue {
-    background: rgba(59,130,246,0.15);
-    color: #60a5fa;
-}
-
-.badge-dark {
-    background: rgba(255,255,255,0.08);
-    color: #e5e7eb;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -563,29 +542,38 @@ passed_checks = safe_int(latest_run["passed_checks"]) if latest_run is not None 
 # --------------------------------------------------
 st.markdown('<div class="app-shell">', unsafe_allow_html=True)
 
-health_status = latest_run["pipeline_health_status"] if latest_run is not None else "N/A"
-run_id = latest_run["run_id"] if latest_run is not None else "-"
 latest_date_str = format_date_badge(latest_date) if latest_date is not None else "No data"
+display_health_status = health_status
+display_run_id = latest_run_id if latest_run_id is not None else "N/A"
 
-st.markdown(
-    f"""
-    <div class="hero-card">
-        <div class="hero-eyebrow">Migros · Price Intelligence</div>
-        <div class="hero-title">Market Overview</div>
-        <div class="hero-subtitle">
-            Retail price tracking & pipeline monitoring — {latest_date_str}
-        </div>
+left_head, right_head = st.columns([3.2, 1])
 
-        <div class="badge-row">
-            <div class="badge badge-green">{health_status}</div>
-            <div class="badge badge-blue">Run #{run_id}</div>
-            <div class="badge badge-dark">{latest_date_str}</div>
+with left_head:
+    st.markdown(
+        f"""
+        <div class="hero-card">
+            <div class="hero-eyebrow">Migros · Price Intelligence</div>
+            <div class="hero-title">Market Overview</div>
+            <div class="hero-subtitle">
+                Retail price tracking & pipeline monitoring — {latest_date_str}
+            </div>
         </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-    
+        """,
+        unsafe_allow_html=True,
+    )
+
+with right_head:
+    st.markdown(
+        f"""
+        <div class="top-badges">
+            <div class="badge badge-health">{display_health_status}</div>
+            <div class="badge badge-run">Run #{display_run_id}</div>
+            <div class="badge badge-date">{latest_date_str}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
 
 nav1, nav2, nav3, nav4, nav5 = st.columns(5)
 
