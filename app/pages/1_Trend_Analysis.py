@@ -235,18 +235,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.markdown(
-    """
-    <div class="nav-row">
-        <div class="nav-item">Overview</div>
-        <div class="nav-item nav-item-active">Trend analysis</div>
-        <div class="nav-item">Top movers</div>
-        <div class="nav-item">Anomalies</div>
-        <div class="nav-item">Pipeline health</div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+nav1, nav2, nav3, nav4, nav5 = st.columns(5)
+
+with nav1:
+    st.page_link("Home.py", label="Overview")
+
+with nav2:
+    st.page_link("pages/1_Trend_Analysis.py", label="Trend analysis")
+
+with nav3:
+    st.page_link("pages/2_Top_Movers.py", label="Top movers")
+
+with nav4:
+    st.page_link("pages/3_Anomalies.py", label="Anomalies")
+
+with nav5:
+    st.page_link("pages/4_Pipeline_Health.py", label="Pipeline health")
 
 # --------------------------------------------------
 # Filters
