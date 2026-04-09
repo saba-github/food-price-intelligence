@@ -320,7 +320,11 @@ st.markdown("""
         font-size: 0.9rem;
         margin-top: 0.22rem;
     }
-
+    .trend-date {
+        font-size: 0.75rem;
+        color: #94a3b8;
+        margin-top: 0.2rem;
+    }
     .empty-state {
         color: #cbd5e1;
         font-size: 0.95rem;
@@ -676,6 +680,8 @@ with right_col:
             first_price = safe_float(product_df["avg_price"].iloc[0])
             latest_price = safe_float(product_df["avg_price"].iloc[-1])
             pct_change = ((latest_price - first_price) / first_price * 100) if first_price != 0 else 0.0
+            last_date = product_df["date"].iloc[-1]
+            last_date_str = last_date.strftime("%b %d").replace(" 0", " ")
             spark_fig = build_sparkline(product_df, pct_change)
 
             with st.container(border=True):
@@ -699,6 +705,7 @@ with right_col:
                         <div class="trend-meta">
                             <div class="trend-price">₺{latest_price:.1f}</div>
                             <div class="{trend_class}">{sign}{pct_change:.1f}%</div>
+                            <div class="trend-date">{last_date_str}</div>
                         </div>
                         """,
                         unsafe_allow_html=True,
