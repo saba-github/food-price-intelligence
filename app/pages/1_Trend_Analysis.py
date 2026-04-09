@@ -2,7 +2,7 @@ import streamlit as st
 import plotly.express as px
 
 from db import run_query
-from queries import  (
+from queries import (
     LATEST_DATES_QUERY,
     CATEGORY_LIST_QUERY,
     TOP_EXPENSIVE_QUERY,
@@ -12,81 +12,419 @@ from queries import  (
 
 st.set_page_config(page_title="Trend Analysis", layout="wide")
 
-st.title("Trend Analysis")
+# --------------------------------------------------
+# Custom CSS
+# --------------------------------------------------
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #0b0d10;
+    }
 
+    [data-testid="stSidebar"] {
+        display: none;
+    }
+
+    .block-container {
+        padding-top: 1.4rem;
+        padding-bottom: 2rem;
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 1400px;
+    }
+
+    div[data-testid="stHorizontalBlock"] {
+        gap: 0.9rem;
+    }
+
+    .app-shell {
+        background: linear-gradient(180deg, #111315 0%, #0c0e11 100%);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 24px;
+        padding: 1.4rem 1.4rem 1.2rem 1.4rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.24);
+    }
+
+    .eyebrow {
+        color: #d4a857;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        margin-bottom: 0.3rem;
+    }
+
+    .hero-title {
+        font-size: 2.15rem;
+        font-weight: 800;
+        color: #ffffff;
+        line-height: 1.05;
+        margin: 0;
+    }
+
+    .hero-subtitle {
+        font-size: 1rem;
+        color: #d1d5db;
+        margin-top: 0.35rem;
+        margin-bottom: 0;
+    }
+
+    .nav-row {
+        display: flex;
+        gap: 2rem;
+        align-items: center;
+        border-bottom: 1px solid rgba(255,255,255,0.10);
+        padding-top: 1.15rem;
+        padding-bottom: 0.85rem;
+        margin-bottom: 1rem;
+        overflow-x: auto;
+    }
+
+    .nav-item {
+        color: #f3f4f6;
+        font-size: 0.95rem;
+        font-weight: 650;
+        white-space: nowrap;
+        opacity: 0.92;
+    }
+
+    .nav-item-active {
+        position: relative;
+    }
+
+    .nav-item-active::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        bottom: -0.87rem;
+        width: 100%;
+        height: 2px;
+        background: #ffffff;
+        border-radius: 999px;
+    }
+
+    .filter-card {
+        background: linear-gradient(180deg, #262626 0%, #222222 100%);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
+        padding: 0.9rem 1rem 1rem 1rem;
+        min-height: 110px;
+    }
+
+    .filter-label {
+        font-size: 0.78rem;
+        color: #b8bfc9;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        margin-bottom: 0.6rem;
+    }
+
+    .metric-card {
+        background: linear-gradient(180deg, #262626 0%, #222222 100%);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 16px;
+        padding: 1rem 1rem 0.9rem 1rem;
+        min-height: 128px;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+    }
+
+    .metric-label {
+        font-size: 0.78rem;
+        color: #b8bfc9;
+        font-weight: 800;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        margin-bottom: 0.7rem;
+    }
+
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 800;
+        color: #ffffff;
+        line-height: 1;
+        margin-bottom: 0.45rem;
+    }
+
+    .metric-sub {
+        font-size: 0.9rem;
+        color: #d1d5db;
+        line-height: 1.3;
+    }
+
+    .panel-card {
+        background: linear-gradient(180deg, #262626 0%, #222222 100%);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 18px;
+        padding: 1rem;
+        margin-top: 1rem;
+    }
+
+    .panel-title {
+        font-size: 1.1rem;
+        font-weight: 800;
+        color: #ffffff;
+        margin-bottom: 0.9rem;
+    }
+
+    .empty-state {
+        color: #cbd5e1;
+        font-size: 0.95rem;
+        padding: 0.4rem 0.1rem;
+    }
+
+    div[data-baseweb="select"] > div {
+        background-color: #111315 !important;
+        border-color: rgba(255,255,255,0.10) !important;
+        color: white !important;
+    }
+
+    .stMarkdown, label, div {
+        color: inherit;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --------------------------------------------------
+# Helpers
+# --------------------------------------------------
+def format_date_badge(value):
+    if value is None:
+        return "No date"
+    try:
+        return value.strftime("%b %-d, %Y")
+    except Exception:
+        try:
+            return value.strftime("%b %d, %Y").replace(" 0", " ")
+        except Exception:
+            return str(value)
+
+def metric_card(label, value, subtext=""):
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-label">{label}</div>
+            <div class="metric-value">{value}</div>
+            <div class="metric-sub">{subtext}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# --------------------------------------------------
+# Load filters
+# --------------------------------------------------
 dates_df = run_query(LATEST_DATES_QUERY)
-available_dates = dates_df["date"].tolist()
+available_dates = dates_df["date"].tolist() if not dates_df.empty else []
 
 categories_df = run_query(CATEGORY_LIST_QUERY)
-available_categories = categories_df["category_name"].dropna().tolist()
+available_categories = categories_df["category_name"].dropna().tolist() if not categories_df.empty else []
 
-col1, col2 = st.columns(2)
+selected_date = available_dates[0] if available_dates else None
+selected_category = "All"
 
-with col1:
-    selected_date = st.selectbox("Select date", available_dates)
+# --------------------------------------------------
+# Header shell
+# --------------------------------------------------
+st.markdown('<div class="app-shell">', unsafe_allow_html=True)
 
-with col2:
+st.markdown('<div class="eyebrow">Migros · Price Intelligence</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">Trend Analysis</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-subtitle">Explore daily pricing patterns, extremes, and product-level trends</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    """
+    <div class="nav-row">
+        <div class="nav-item">Overview</div>
+        <div class="nav-item nav-item-active">Trend analysis</div>
+        <div class="nav-item">Top movers</div>
+        <div class="nav-item">Anomalies</div>
+        <div class="nav-item">Pipeline health</div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# --------------------------------------------------
+# Filters
+# --------------------------------------------------
+f1, f2 = st.columns(2)
+
+with f1:
+    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
+    st.markdown('<div class="filter-label">Selected Date</div>', unsafe_allow_html=True)
+    if available_dates:
+        selected_date = st.selectbox(
+            "Selected Date",
+            available_dates,
+            label_visibility="collapsed",
+        )
+    else:
+        st.markdown('<div class="empty-state">No dates available.</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with f2:
+    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
+    st.markdown('<div class="filter-label">Category Filter</div>', unsafe_allow_html=True)
     selected_category = st.selectbox(
-        "Filter by category",
-        ["All"] + available_categories
+        "Category Filter",
+        ["All"] + available_categories,
+        label_visibility="collapsed",
     )
+    st.markdown('</div>', unsafe_allow_html=True)
 
-expensive_df = run_query(TOP_EXPENSIVE_QUERY, {"selected_date": selected_date})
-cheap_df = run_query(TOP_CHEAPEST_QUERY, {"selected_date": selected_date})
+# --------------------------------------------------
+# Main data
+# --------------------------------------------------
+if selected_date is not None:
+    expensive_df = run_query(TOP_EXPENSIVE_QUERY, {"selected_date": selected_date})
+    cheap_df = run_query(TOP_CHEAPEST_QUERY, {"selected_date": selected_date})
+else:
+    expensive_df = run_query(TOP_EXPENSIVE_QUERY, {"selected_date": None}) if False else None
+    cheap_df = run_query(TOP_CHEAPEST_QUERY, {"selected_date": None}) if False else None
 
-if selected_category != "All":
+if selected_date is None:
+    expensive_df = None
+    cheap_df = None
+
+if expensive_df is not None and selected_category != "All":
     expensive_df = expensive_df[expensive_df["category_name"] == selected_category]
+
+if cheap_df is not None and selected_category != "All":
     cheap_df = cheap_df[cheap_df["category_name"] == selected_category]
 
-c1, c2, c3 = st.columns(3)
+# --------------------------------------------------
+# KPI cards
+# --------------------------------------------------
+k1, k2, k3 = st.columns(3)
 
-with c1:
-    st.metric("Selected Date", str(selected_date))
+with k1:
+    metric_card(
+        "Selected Date",
+        format_date_badge(selected_date) if selected_date is not None else "N/A",
+        "Current analysis snapshot",
+    )
 
-with c2:
-    st.metric(
+with k2:
+    metric_card(
         "Most Expensive",
-        expensive_df.iloc[0]["standardized_product_name"] if not expensive_df.empty else "-"
+        expensive_df.iloc[0]["standardized_product_name"] if expensive_df is not None and not expensive_df.empty else "-",
+        f"Category: {expensive_df.iloc[0]['category_name']}" if expensive_df is not None and not expensive_df.empty else "No data",
     )
 
-with c3:
-    st.metric(
+with k3:
+    metric_card(
         "Cheapest",
-        cheap_df.iloc[0]["standardized_product_name"] if not cheap_df.empty else "-"
+        cheap_df.iloc[0]["standardized_product_name"] if cheap_df is not None and not cheap_df.empty else "-",
+        f"Category: {cheap_df.iloc[0]['category_name']}" if cheap_df is not None and not cheap_df.empty else "No data",
     )
 
-st.subheader("Top 10 Most Expensive Products")
-fig_expensive = px.bar(
-    expensive_df,
-    x="standardized_product_name",
-    y="avg_price",
-    hover_data=["category_name"],
-)
-st.plotly_chart(fig_expensive, use_container_width=True)
+# --------------------------------------------------
+# Bar charts
+# --------------------------------------------------
+left_col, right_col = st.columns(2)
 
-st.subheader("Top 10 Cheapest Products")
-fig_cheap = px.bar(
-    cheap_df,
-    x="standardized_product_name",
-    y="avg_price",
-    hover_data=["category_name"],
-)
-st.plotly_chart(fig_cheap, use_container_width=True)
+with left_col:
+    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">Top 10 Most Expensive Products</div>', unsafe_allow_html=True)
 
-product_pool = sorted(
-    list(set(expensive_df["standardized_product_name"].dropna().tolist()
-    + cheap_df["standardized_product_name"].dropna().tolist()))
-)
+    if expensive_df is None or expensive_df.empty:
+        st.markdown('<div class="empty-state">No expensive-product data available.</div>', unsafe_allow_html=True)
+    else:
+        fig_expensive = px.bar(
+            expensive_df,
+            x="standardized_product_name",
+            y="avg_price",
+            hover_data=["category_name"],
+        )
+        fig_expensive.update_layout(
+            height=420,
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="",
+            yaxis_title="Price",
+            font=dict(color="white"),
+        )
+        st.plotly_chart(fig_expensive, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with right_col:
+    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+    st.markdown('<div class="panel-title">Top 10 Cheapest Products</div>', unsafe_allow_html=True)
+
+    if cheap_df is None or cheap_df.empty:
+        st.markdown('<div class="empty-state">No cheapest-product data available.</div>', unsafe_allow_html=True)
+    else:
+        fig_cheap = px.bar(
+            cheap_df,
+            x="standardized_product_name",
+            y="avg_price",
+            hover_data=["category_name"],
+        )
+        fig_cheap.update_layout(
+            height=420,
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="",
+            yaxis_title="Price",
+            font=dict(color="white"),
+        )
+        st.plotly_chart(fig_cheap, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --------------------------------------------------
+# Product trend view
+# --------------------------------------------------
+if expensive_df is not None and cheap_df is not None:
+    product_pool = sorted(
+        list(
+            set(
+                expensive_df["standardized_product_name"].dropna().tolist()
+                + cheap_df["standardized_product_name"].dropna().tolist()
+            )
+        )
+    )
+else:
+    product_pool = []
+
+st.markdown('<div class="panel-card">', unsafe_allow_html=True)
+st.markdown('<div class="panel-title">Daily Product Trend</div>', unsafe_allow_html=True)
 
 if product_pool:
-    selected_product = st.selectbox("Select product for trend view", product_pool)
+    selected_product = st.selectbox(
+        "Select product for trend view",
+        product_pool,
+        label_visibility="visible",
+    )
+
     trend_df = run_query(PRICE_TREND_QUERY, {"product_name": selected_product})
 
-    st.subheader(f"Daily Trend — {selected_product}")
-    fig_trend = px.line(
-        trend_df,
-        x="date",
-        y="avg_price",
-        markers=True,
-    )
-    st.plotly_chart(fig_trend, use_container_width=True)
+    if trend_df.empty:
+        st.markdown('<div class="empty-state">No trend data available for this product.</div>', unsafe_allow_html=True)
+    else:
+        fig_trend = px.line(
+            trend_df,
+            x="date",
+            y="avg_price",
+            markers=True,
+        )
+        fig_trend.update_layout(
+            height=420,
+            margin=dict(l=10, r=10, t=10, b=10),
+            paper_bgcolor="rgba(0,0,0,0)",
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis_title="Date",
+            yaxis_title="Average Price",
+            font=dict(color="white"),
+        )
+        st.plotly_chart(fig_trend, use_container_width=True)
+else:
+    st.markdown('<div class="empty-state">No products available for trend view.</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
