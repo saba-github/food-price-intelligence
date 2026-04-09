@@ -216,6 +216,38 @@ st.markdown("""
     .stMarkdown, label, div {
         color: inherit;
     }
+
+        .hero-card {
+        background: radial-gradient(1200px 400px at 20% 0%, rgba(59,130,246,0.18), transparent 60%),
+                    linear-gradient(180deg, #111315 0%, #0c0e11 100%);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 20px;
+        padding: 1.2rem 1.4rem 1.1rem 1.4rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+        margin-bottom: 1rem;
+    }
+
+        div[data-testid="stPageLink"] {
+        text-align: center;
+        margin-bottom: 0.4rem;
+    }
+
+    div[data-testid="stPageLink"] a {
+        color: #f3f4f6 !important;
+        text-decoration: none !important;
+        font-size: 0.95rem;
+        font-weight: 650;
+        padding: 0.4rem 0.75rem;
+        border-radius: 10px;
+        display: inline-block;
+    }
+
+    div[data-testid="stPageLink"] a:hover {
+        color: white !important;
+        background: rgba(255,255,255,0.05);
+    }
+    
+    
 </style>
 """, unsafe_allow_html=True)
 
@@ -293,23 +325,7 @@ with nav5:
     st.page_link("pages/4_Pipeline_Health.py", label="Pipeline health")
 
 
-st.markdown(
-    """
-    <div style="display:flex; justify-content:center; margin-top:-0.1rem; margin-bottom:0.6rem;">
-        <div style="
-            background: rgba(255,255,255,0.08);
-            color: white;
-            padding: 0.35rem 0.8rem;
-            border-radius: 10px;
-            font-size: 0.92rem;
-            font-weight: 700;
-        ">
-            Trend analysis
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+
 # --------------------------------------------------
 # Filters
 # --------------------------------------------------
@@ -325,7 +341,6 @@ st.markdown(
 f1, f2 = st.columns(2)
 
 with f1:
-    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
     st.markdown('<div class="filter-label">Selected Date</div>', unsafe_allow_html=True)
     if available_dates:
         selected_date = st.selectbox(
@@ -335,17 +350,14 @@ with f1:
         )
     else:
         st.markdown('<div class="empty-state">No dates available.</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
 with f2:
-    st.markdown('<div class="filter-card">', unsafe_allow_html=True)
     st.markdown('<div class="filter-label">Category Filter</div>', unsafe_allow_html=True)
     selected_category = st.selectbox(
         "Category Filter",
         ["All"] + available_categories,
         label_visibility="collapsed",
     )
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # --------------------------------------------------
 # Main data
@@ -423,7 +435,7 @@ with left_col:
             yaxis_title="",
             font=dict(color="white"),
         )
-        st.plotly_chart(fig_expensive, use_container_width=True)
+        st.plotly_chart(fig_expensive, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
 with right_col:
@@ -451,7 +463,7 @@ with right_col:
             yaxis_title="",
             font=dict(color="white"),
         )
-        st.plotly_chart(fig_cheap, use_container_width=True)
+        st.plotly_chart(fig_cheap, use_container_width=True, config={"displayModeBar": False})
     st.markdown('</div>', unsafe_allow_html=True)
 
 # --------------------------------------------------
@@ -532,7 +544,7 @@ if product_pool:
             yaxis_title="Average Price",
             font=dict(color="white"),
         )
-        st.plotly_chart(fig_trend, use_container_width=True)
+        st.plotly_chart(fig_trend, use_container_width=True, config={"displayModeBar": False})
 else:
     st.markdown('<div class="empty-state">No products available for trend view.</div>', unsafe_allow_html=True)
 
