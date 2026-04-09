@@ -574,20 +574,7 @@ with right_head:
         unsafe_allow_html=True,
     )
 
-# BADGES (AYRI)
-left_head, right_head = st.columns([4, 1])
 
-with right_head:
-    st.markdown(
-        f"""
-        <div class="top-badges">
-            <div class="badge badge-health">{health_status}</div>
-            <div class="badge badge-run">Run #{run_id}</div>
-            <div class="badge badge-date">{latest_date_str}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
 nav1, nav2, nav3, nav4, nav5 = st.columns(5)
 
 with nav1:
