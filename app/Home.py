@@ -267,6 +267,9 @@ st.markdown("""
         color: #ffffff;
         line-height: 1.15;
         margin-bottom: 0.2rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .item-sub {
@@ -427,8 +430,8 @@ def build_sparkline(product_df, pct_change):
     )
 
     fig.update_layout(
-        margin=dict(l=0, r=0, t=0, b=0),
-        height=52,
+        margin=dict(l=0, r=0, t=6, b=6),
+        height=60,
         xaxis=dict(visible=False, fixedrange=True),
         yaxis=dict(visible=False, fixedrange=True),
         showlegend=False,
@@ -436,7 +439,6 @@ def build_sparkline(product_df, pct_change):
         plot_bgcolor="rgba(0,0,0,0)",
     )
     return fig
-
 # --------------------------------------------------
 # Load data
 # --------------------------------------------------
@@ -673,33 +675,33 @@ with right_col:
             pct_change = ((latest_price - first_price) / first_price * 100) if first_price != 0 else 0.0
             spark_fig = build_sparkline(product_df, pct_change)
 
-            st.markdown('<div class="item-card">', unsafe_allow_html=True)
-            a, b, c = st.columns([1.2, 1.35, 0.75])
+            with st.container(border=True):
+                a, b, c = st.columns([1.2, 1.35, 0.75])
 
-            with a:
-                st.markdown(f'<div class="item-title">{product}</div>', unsafe_allow_html=True)
+                with a:
+                    st.markdown(f'<div class="item-title">{product}</div>', unsafe_allow_html=True)
 
-            with b:
-                st.plotly_chart(
-                    spark_fig,
-                    use_container_width=True,
-                    config={"displayModeBar": False},
-                )
+                with b:
+                    st.plotly_chart(
+                        spark_fig,
+                        use_container_width=True,
+                        config={"displayModeBar": False},
+                    )
 
-            with c:
-                trend_class = "trend-change-up" if pct_change >= 0 else "trend-change-down"
-                sign = "+" if pct_change >= 0 else ""
-                st.markdown(
-                    f"""
-                    <div class="trend-meta">
-                        <div class="trend-price">₺{latest_price:.1f}</div>
-                        <div class="{trend_class}">{sign}{pct_change:.1f}%</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
+                with c:
+                    trend_class = "trend-change-up" if pct_change >= 0 else "trend-change-down"
+                    sign = "+" if pct_change >= 0 else ""
+                    st.markdown(
+                        f"""
+                        <div class="trend-meta">
+                            <div class="trend-price">₺{latest_price:.1f}</div>
+                            <div class="{trend_class}">{sign}{pct_change:.1f}%</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
 
-            st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
