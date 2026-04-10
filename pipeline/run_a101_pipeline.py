@@ -1,10 +1,18 @@
 import logging
+from typing import Any
 
 from config.retailers import RETAILER_CONFIG
 from pipeline.db import get_connection
+from pipeline.dimensions import get_or_create_product_id
+from pipeline.loaders_fact import insert_fact_observation
 from pipeline.loaders_raw import insert_raw_event
-from pipeline.loaders_staging import insert_stg_source_product
+from pipeline.loaders_staging import (
+    insert_stg_normalized_observation,
+    insert_stg_observation,
+    insert_stg_source_product,
+)
 from pipeline.run_lifecycle import start_run, finish_run, fail_run
+from pipeline.transforms import transform_product
 from scraper.a101.categories import get_a101_category_products
 
 logging.basicConfig(level=logging.INFO)
@@ -21,36 +29,36 @@ def run_pipeline(category_key: str):
     run_id = None
 
     try:
+        # -------------------------
+        # 1) SCRAPE
+        # -------------------------
+        products = get_a101_category_products(category_slug)
+        logger.info("A101 scraped %d products", len(products))
+
+        # -------------------------
+        # 2) DB CONNECT
+        # -------------------------
         conn = get_connection()
 
-        # ---------------------------
-        # START RUN
-        # ---------------------------
         with conn.cursor() as cur:
             run_id = start_run(
                 cur,
                 source_name=source_name,
                 category_key=category_key,
                 category_slug=category_slug,
-                triggered_by="github_actions",
-                pipeline_version="v1-a101",
+                triggered_by="local_test",
+                pipeline_version="v2-a101",
             )
             conn.commit()
 
-        # ---------------------------
-        # SCRAPE
-        # ---------------------------
-        products = get_a101_category_products(category_slug)
-
-        logger.info("A101 scraped %d products", len(products))
-
         raw_count = 0
         stg_count = 0
+        fact_count = 0
         failed_count = 0
 
-        # ---------------------------
-        # PROCESS PRODUCTS
-        # ---------------------------
+        # -------------------------
+        # 3) LOOP PRODUCTS
+        # -------------------------
         for product in products:
             try:
                 with conn.cursor() as cur:
@@ -67,9 +75,51 @@ def run_pipeline(category_key: str):
                     # STG SOURCE
                     insert_stg_source_product(
                         cur,
-                        event_id,
+                        event_id=event_id,
                         run_id=run_id,
                         product=product,
+                        source_name=source_name,
+                    )
+
+                    # TRANSFORM
+                    transformed = transform_product(product)
+
+                    # DIM
+                    product_id = get_or_create_product_id(
+                        cur,
+                        transformed["standardized_product_name"],
+                        transformed.get("category_name"),
+                    )
+
+                    # STG NORMALIZED
+                    insert_stg_normalized_observation(
+                        cur,
+                        event_id,
+                        run_id,
+                        product,
+                        transformed,
+                        source_name=source_name,
+                    )
+
+                    # STG OBS
+                    observation_id = insert_stg_observation(
+                        cur,
+                        event_id,
+                        run_id,
+                        product,
+                        transformed,
+                        source_name=source_name,
+                        currency=currency,
+                    )
+
+                    # FACT
+                    inserted = insert_fact_observation(
+                        cur,
+                        observation_id,
+                        run_id,
+                        product,
+                        transformed,
+                        product_id,
                         source_name=source_name,
                     )
 
@@ -78,44 +128,59 @@ def run_pipeline(category_key: str):
                     raw_count += 1
                     stg_count += 1
 
-            except Exception as e:
-                conn.rollback()
-                failed_count += 1
-                logger.error("Failed A101 product: %s", e)
+                    if inserted:
+                        fact_count += 1
 
-        # ---------------------------
-        # FINISH RUN
-        # ---------------------------
+            except Exception as e:
+                failed_count += 1
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+
+                logger.exception("A101 product failed: %s", e)
+
+        # -------------------------
+        # 4) FINISH RUN
+        # -------------------------
         with conn.cursor() as cur:
             finish_run(
                 cur,
-                run_id,
+                run_id=run_id,
                 records_scraped=len(products),
                 records_raw=raw_count,
                 records_stg=stg_count,
-                records_fact=0,
+                records_fact=fact_count,
                 records_suspicious=0,
                 records_failed=failed_count,
             )
             conn.commit()
 
-        logger.info("A101 pipeline completed successfully")
+        logger.info("=" * 40)
+        logger.info("A101 RUN COMPLETED")
+        logger.info("Products scraped : %d", len(products))
+        logger.info("Raw inserted     : %d", raw_count)
+        logger.info("Stg inserted     : %d", stg_count)
+        logger.info("Fact inserted    : %d", fact_count)
 
     except Exception as e:
-        if conn is not None:
-            conn.rollback()
+        if conn:
+            try:
+                conn.rollback()
+            except:
+                pass
 
-        if run_id is not None and conn is not None:
+        if conn and run_id:
             try:
                 with conn.cursor() as cur:
                     fail_run(cur, run_id, str(e))
                     conn.commit()
-            except Exception:
-                conn.rollback()
+            except:
+                pass
 
         logger.exception("A101 pipeline failed: %s", e)
         raise
 
     finally:
-        if conn is not None:
+        if conn:
             conn.close()

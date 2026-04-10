@@ -1,10 +1,10 @@
 import logging
-from typing import Any
+from typing import Any, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-def can_insert_to_fact(transformed: dict[str, Any]) -> tuple[bool, str | None]:
+def can_insert_to_fact(transformed: dict[str, Any]) -> Tuple[bool, Optional[str]]:
     if transformed.get("is_suspicious"):
         return False, "suspicious_record"
 
