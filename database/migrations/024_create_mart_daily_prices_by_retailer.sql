@@ -10,7 +10,7 @@ SELECT
     AVG(price_per_unit) AS avg_price,
     MIN(price_per_unit) AS min_price,
     MAX(price_per_unit) AS max_price,
-    COUNT(*) AS observation_count
+    COUNT(*) AS observation_count 
 FROM fact_price_observations
 WHERE price_per_unit IS NOT NULL
 GROUP BY 1,2,3,4,5;
