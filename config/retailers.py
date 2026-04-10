@@ -7,5 +7,13 @@ RETAILER_CONFIG = {
             "dairy_breakfast": "sut-kahvaltilik-c-4",
             "beverages": "icecek-c-6",
         },
+    },
+
+    "a101": {
+        "source_name": "a101",
+        "currency": "TRY",
+          "categories": {
+            "fruit_veg": "meyve-ve-sebze",
+        },
     }
 }
