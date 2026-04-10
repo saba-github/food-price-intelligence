@@ -1,26 +1,28 @@
+import argparse
 import logging
-import os
 from typing import Any
 
-import psycopg2
-
 from dotenv import load_dotenv
+
+from pipeline.db import get_connection
+from pipeline.dimensions import get_or_create_product_id
+from pipeline.loaders_fact import insert_fact_observation
 from pipeline.loaders_raw import insert_raw_event
-from scraper.migros.categories import get_migros_category_products
+from pipeline.loaders_staging import (
+    insert_stg_normalized_observation,
+    insert_stg_observation,
+    insert_stg_source_product,
+)
 from pipeline.marts import refresh_materialized_views
 from pipeline.quality import log_quality_check
-from pipeline.run_lifecycle import start_run, finish_run, fail_run
-from pipeline.dimensions import get_or_create_product_id
-from pipeline.db import get_connection
-
-from pipeline.loaders_staging import (
-    insert_stg_source_product,
-    insert_stg_observation,
-    insert_stg_normalized_observation,
-)
-
+from pipeline.run_lifecycle import fail_run, finish_run, start_run
 from pipeline.transforms import transform_product
-from pipeline.loaders_fact import insert_fact_observation
+from scraper.migros.categories import get_migros_category_products
+from scraper.migros.config import (
+    MIGROS_CATEGORY_MAP,
+    MIGROS_CURRENCY,
+    MIGROS_SOURCE_NAME,
+)
 
 load_dotenv()
 
@@ -36,17 +38,13 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-DEFAULT_CATEGORY_SLUG = "meyve-sebze-c-2"
-SOURCE_NAME = "migros"
-CURRENCY = "TRY"
-
+DEFAULT_CATEGORY_KEY = "fruit_veg"
+PIPELINE_VERSION = "v2-prep-002"
 
 
 # ---------------------------------------------------------------------------
-# Per-product insert (kendi transaction'ı var)
+# Per-product insert
 # ---------------------------------------------------------------------------
-
-
 def process_product(
     conn,
     run_id: int,
@@ -61,57 +59,57 @@ def process_product(
     transformed = None
 
     try:
-        # 1️⃣ RAW
+        # 1) RAW
         event_id = insert_raw_event(
             cursor,
             run_id,
             product,
             category_slug,
-            source_name=SOURCE_NAME,
-            currency=CURRENCY,
+            source_name=MIGROS_SOURCE_NAME,
+            currency=MIGROS_CURRENCY,
         )
 
-        # 2️⃣ STG SOURCE
+        # 2) STG SOURCE
         insert_stg_source_product(
             cursor,
             event_id,
             run_id,
             product,
-            source_name=SOURCE_NAME,
+            source_name=MIGROS_SOURCE_NAME,
         )
 
-        # 3️⃣ TRANSFORM
+        # 3) TRANSFORM
         transformed = transform_product(product)
 
-        # 4️⃣ DIM PRODUCT (NEW 🔥)
+        # 4) DIM PRODUCT
         product_id = get_or_create_product_id(
             cursor,
             transformed["standardized_product_name"],
             transformed.get("category_name"),
         )
 
-        # 5️⃣ STG NORMALIZED (SADECE 1 KEZ!)
+        # 5) STG NORMALIZED
         insert_stg_normalized_observation(
             cursor,
             event_id,
             run_id,
             product,
             transformed,
-            source_name=SOURCE_NAME,
+            source_name=MIGROS_SOURCE_NAME,
         )
 
-        # 6️⃣ STG OBSERVATION
+        # 6) STG OBSERVATION
         observation_id = insert_stg_observation(
             cursor,
             event_id,
             run_id,
             product,
             transformed,
-            source_name=SOURCE_NAME,
-            currency=CURRENCY,
+            source_name=MIGROS_SOURCE_NAME,
+            currency=MIGROS_CURRENCY,
         )
 
-        # 7️⃣ FACT
+        # 7) FACT
         fact_inserted = insert_fact_observation(
             cursor,
             observation_id,
@@ -119,10 +117,10 @@ def process_product(
             product,
             transformed,
             product_id,
-            source_name=SOURCE_NAME,
+            source_name=MIGROS_SOURCE_NAME,
         )
 
-        # 8️⃣ COMMIT
+        # 8) COMMIT
         conn.commit()
 
         return {
@@ -157,12 +155,22 @@ def process_product(
     finally:
         cursor.close()
 
+
 # ---------------------------------------------------------------------------
 # Main pipeline
 # ---------------------------------------------------------------------------
-def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
+def run_pipeline(category_key: str = DEFAULT_CATEGORY_KEY):
+    if category_key not in MIGROS_CATEGORY_MAP:
+        valid_keys = ", ".join(MIGROS_CATEGORY_MAP.keys())
+        raise ValueError(
+            f"Invalid category_key={category_key!r}. Valid options: {valid_keys}"
+        )
+
+    category_slug = MIGROS_CATEGORY_MAP[category_key]
+
     conn = None
     run_id = None
+    scraped_products: list[dict[str, Any]] = []
 
     try:
         conn = get_connection()
@@ -170,22 +178,47 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
         with conn.cursor() as cur:
             run_id = start_run(
                 cur,
-                source_name=SOURCE_NAME,
+                source_name=MIGROS_SOURCE_NAME,
+                category_key=category_key,
                 category_slug=category_slug,
                 triggered_by="github_actions",
-                pipeline_version="v2-prep-001",
+                pipeline_version=PIPELINE_VERSION,
             )
             conn.commit()
 
         scraped_products = get_migros_category_products(category_slug)
+
         logger.info(
-            "Scraped %d products from category=%s",
+            "Scraped %d products from category_key=%s category_slug=%s",
             len(scraped_products),
+            category_key,
             category_slug,
         )
 
+        if not scraped_products:
+            with conn.cursor() as cur:
+                log_quality_check(
+                    cur,
+                    run_id,
+                    "category_scrape_not_empty",
+                    "fail",
+                    0,
+                    1,
+                    f"No products returned for retailer={MIGROS_SOURCE_NAME} category_key={category_key}",
+                )
+                fail_run(
+                    cur,
+                    run_id,
+                    f"No products returned for category_key={category_key} category_slug={category_slug}",
+                )
+                conn.commit()
+
+            raise RuntimeError(
+                f"No products returned for category_key={category_key} category_slug={category_slug}"
+            )
+
         success_count = 0
-        failed_products: list[dict] = []
+        failed_products: list[dict[str, Any]] = []
         raw_count = 0
         stg_count = 0
         fact_count = 0
@@ -208,6 +241,9 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
                 failed_count += 1
 
         with conn.cursor() as cur:
+            # ---------------------------
+            # FACT DATA QUALITY CHECKS
+            # ---------------------------
             cur.execute(
                 """
                 select count(*)::int,
@@ -220,8 +256,12 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             )
             total_rows, non_null_price_per_unit_rows, non_null_category_rows = cur.fetchone()
 
-            price_check_status = "pass" if total_rows == non_null_price_per_unit_rows else "fail"
-            category_check_status = "pass" if total_rows == non_null_category_rows else "fail"
+            price_check_status = (
+                "pass" if total_rows == non_null_price_per_unit_rows else "fail"
+            )
+            category_check_status = (
+                "pass" if total_rows == non_null_category_rows else "fail"
+            )
 
             log_quality_check(
                 cur,
@@ -246,6 +286,9 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
             if price_check_status == "fail" or category_check_status == "fail":
                 raise RuntimeError("Data quality checks failed for current run.")
 
+            # ---------------------------
+            # FINISH RUN
+            # ---------------------------
             finish_run(
                 cur,
                 run_id,
@@ -257,13 +300,14 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
                 records_failed=failed_count,
             )
 
+            # ---------------------------
+            # REFRESH MARTS
+            # ---------------------------
             refresh_materialized_views(cur)
+
             # ---------------------------
             # MART DATA QUALITY CHECKS
             # ---------------------------
-
-
-            # Check 1: latest mart date için avg_price null olmamalı
             cur.execute(
                 """
                 select max(date)
@@ -295,7 +339,6 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
                 "avg_price should not be null in mart_daily_prices for the latest mart date",
             )
 
-            # Check 2: full grain duplicate kontrolü
             cur.execute(
                 """
                 select count(*)
@@ -331,21 +374,16 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
 
             conn.commit()
 
-
-
-
-
-
-        
         logger.info("=" * 50)
-        logger.info("Run ID       : %s", run_id)
-        logger.info("Category     : %s", category_slug)
-        logger.info("Success      : %d", success_count)
-        logger.info("Failed       : %d", len(failed_products))
-        logger.info("Raw inserted : %d", raw_count)
-        logger.info("Stg inserted : %d", stg_count)
-        logger.info("Fact inserted: %d", fact_count)
-        logger.info("Suspicious   : %d", suspicious_count)
+        logger.info("Run ID        : %s", run_id)
+        logger.info("Category Key  : %s", category_key)
+        logger.info("Category Slug : %s", category_slug)
+        logger.info("Success       : %d", success_count)
+        logger.info("Failed        : %d", len(failed_products))
+        logger.info("Raw inserted  : %d", raw_count)
+        logger.info("Stg inserted  : %d", stg_count)
+        logger.info("Fact inserted : %d", fact_count)
+        logger.info("Suspicious    : %d", suspicious_count)
 
         if failed_products:
             logger.warning("Failed products:")
@@ -376,4 +414,8 @@ def run_pipeline(category_slug: str = DEFAULT_CATEGORY_SLUG):
 
 
 if __name__ == "__main__":
-    run_pipeline(DEFAULT_CATEGORY_SLUG)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--category", default=DEFAULT_CATEGORY_KEY)
+    args = parser.parse_args()
+
+    run_pipeline(args.category)
