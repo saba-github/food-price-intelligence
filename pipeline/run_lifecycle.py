@@ -3,28 +3,42 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def start_run(cursor, source_name: str, category_slug: str, triggered_by: str, pipeline_version: str) -> int:
+def start_run(
+    cursor,
+    source_name: str,
+    category_key: str,
+    category_slug: str,
+    triggered_by: str,
+    pipeline_version: str,
+) -> int:
     cursor.execute(
         """
         INSERT INTO scrape_runs (
             source_name,
+            category_key,
             category_slug,
             status,
             triggered_by,
             pipeline_version
         )
-        VALUES (%s, %s, 'running', %s, %s)
+        VALUES (%s, %s, %s, 'running', %s, %s)
         RETURNING run_id
         """,
         (
             source_name,
+            category_key,
             category_slug,
             triggered_by,
             pipeline_version,
         ),
     )
     run_id = cursor.fetchone()[0]
-    logger.info("Run started — run_id=%s  category=%s", run_id, category_slug)
+    logger.info(
+        "Run started — run_id=%s category_key=%s category_slug=%s",
+        run_id,
+        category_key,
+        category_slug,
+    )
     return run_id
 
 
@@ -74,4 +88,4 @@ def fail_run(cursor, run_id: int, error_message: str):
         """,
         (error_message[:5000], run_id),
     )
-    logger.error("Run failed — run_id=%s  error=%s", run_id, error_message[:200])
+    logger.error("Run failed — run_id=%s error=%s", run_id, error_message[:200])
