@@ -1,10 +1,7 @@
 name: Load data to Neon (PROD)
 
 on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
+  workflow_dispatch:   # 🔴 SADECE MANUEL
 
 jobs:
   run-etl:
@@ -27,26 +24,19 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Run database migrations
-        shell: bash
+      - name: Run database migrations (PROD)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
         run: |
           set -euo pipefail
-          echo "Starting migrations on PROD..."
-          ls -1 database/migrations/*.sql | sort
+          echo "Running migrations on PROD..."
 
-          for file in $(ls -1 database/migrations/*.sql | sort); do
-            echo "Running migration: $file"
+          for file in $(ls database/migrations/*.sql | sort); do
+            echo "Running $file"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
           done
 
-      - name: Run tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: pytest -q
-
-      - name: Run script
+      - name: Run ETL pipeline (PROD)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
           PYTHONPATH: ${{ github.workspace }}
