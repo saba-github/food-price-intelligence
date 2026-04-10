@@ -16,10 +16,6 @@ st.markdown("""
         background-color: #070b11;
     }
 
-    [data-testid="stSidebar"] {
-        display: none;
-    }
-
     .block-container {
         padding-top: 1.3rem;
         padding-bottom: 2rem;
@@ -39,13 +35,54 @@ st.markdown("""
         border-radius: 22px;
     }
 
+    .hero-wrap {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 0.9rem;
+    }
+
     .hero-card {
-        background: linear-gradient(135deg, #0f2034 0%, #0b0f16 55%, #0a0d12 100%);
+        flex: 1;
+        background: linear-gradient(135deg, #10233c 0%, #0b1017 58%, #090d12 100%);
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 22px;
-        padding: 1.4rem 1.5rem 1.2rem 1.5rem;
-        margin-bottom: 1rem;
+        padding: 1.3rem 1.5rem 1.15rem 1.5rem;
         box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+    }
+
+    .hero-badges {
+        display: flex;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        min-width: 230px;
+    }
+
+    .status-pill {
+        padding: 0.58rem 0.9rem;
+        border-radius: 999px;
+        font-size: 0.82rem;
+        font-weight: 700;
+        border: 1px solid rgba(255,255,255,0.08);
+        box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+        white-space: nowrap;
+    }
+
+    .pill-success {
+        background: #dff5e9;
+        color: #157a52;
+    }
+
+    .pill-info {
+        background: #eef2ff;
+        color: #3559e6;
+    }
+
+    .pill-dark {
+        background: #111827;
+        color: #ffffff;
     }
 
     .eyebrow {
@@ -66,37 +103,44 @@ st.markdown("""
     }
 
     .hero-subtitle {
-        color: #c7d1db;
-        font-size: 0.98rem;
+        color: #c8d2dd;
+        font-size: 0.96rem;
+        line-height: 1.45;
         margin-bottom: 0;
     }
 
     .nav-row {
         display: flex;
-        gap: 1rem;
+        justify-content: space-between;
         align-items: center;
-        margin: 0.25rem 0 1rem 0;
+        margin: 0.5rem 0 1rem 0;
+        flex-wrap: wrap;
+        gap: 0.8rem;
+    }
+
+    .nav-links {
+        display: flex;
+        gap: 0.85rem;
         flex-wrap: wrap;
     }
 
     .nav-pill {
         color: #d8dee7;
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.07);
+        background: transparent;
         border-radius: 999px;
-        padding: 0.32rem 0.75rem;
-        font-size: 0.82rem;
-        font-weight: 600;
+        padding: 0.38rem 0.75rem;
+        font-size: 0.83rem;
+        font-weight: 700;
     }
 
     .nav-pill.active {
-        background: #ffffff;
-        color: #0b0f16;
-        border-color: #ffffff;
+        background: rgba(255,255,255,0.10);
+        border: 1px solid rgba(255,255,255,0.08);
+        color: #ffffff;
     }
 
     .metric-card {
-        background: linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%);
+        background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%);
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 18px;
         padding: 1rem 1rem 0.95rem 1rem;
@@ -118,7 +162,7 @@ st.markdown("""
         font-size: 2rem;
         font-weight: 800;
         line-height: 1.05;
-        margin-bottom: 0.32rem;
+        margin-bottom: 0.3rem;
     }
 
     .metric-help {
@@ -127,9 +171,20 @@ st.markdown("""
         line-height: 1.35;
     }
 
+    .info-banner {
+        background: #dff1e8;
+        color: #10231a;
+        border-radius: 14px;
+        padding: 0.82rem 1rem;
+        border: 1px solid #c7e6d7;
+        margin-bottom: 0.9rem;
+        font-size: 0.94rem;
+        font-weight: 600;
+    }
+
     .section-bar {
-        margin-top: 1rem;
-        margin-bottom: 0.85rem;
+        margin-top: 0.9rem;
+        margin-bottom: 0.9rem;
         height: 18px;
         border-radius: 999px;
         background: linear-gradient(90deg, rgba(255,255,255,0.10), rgba(255,255,255,0.04));
@@ -149,15 +204,12 @@ st.markdown("""
         margin-bottom: 0.9rem;
     }
 
-    .info-banner {
-        background: #dff3e8;
-        color: #10231a;
-        border-radius: 14px;
-        padding: 0.8rem 1rem;
-        border: 1px solid #c7e8d5;
-        margin-bottom: 0.8rem;
-        font-size: 0.94rem;
-        font-weight: 600;
+    .empty-box {
+        background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+        border: 1px dashed rgba(255,255,255,0.14);
+        border-radius: 18px;
+        padding: 1.4rem 1.2rem;
+        color: #d1d8e0;
     }
 
     .stDataFrame, div[data-testid="stDataFrame"] {
@@ -166,18 +218,11 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.08);
     }
 
-    div[data-testid="stMetric"] {
-        background: transparent !important;
-        border: none !important;
-        box-shadow: none !important;
-        padding: 0 !important;
-    }
-
     .stPlotlyChart {
         background: linear-gradient(135deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
         border: 1px solid rgba(255,255,255,0.08);
         border-radius: 18px;
-        padding: 0.4rem 0.5rem 0.3rem 0.5rem;
+        padding: 0.35rem 0.45rem 0.2rem 0.45rem;
     }
 
     .stSelectbox > div > div {
@@ -186,18 +231,13 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.10) !important;
         border-radius: 10px !important;
     }
-
-    .empty-box {
-        background: linear-gradient(135deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
-        border: 1px dashed rgba(255,255,255,0.14);
-        border-radius: 18px;
-        padding: 1.4rem 1.2rem;
-        color: #d1d8e0;
-    }
 </style>
 """, unsafe_allow_html=True)
 
 
+# --------------------------------------------------
+# Helpers
+# --------------------------------------------------
 @st.cache_data(show_spinner=False, ttl=300)
 def get_anomalies_data() -> pd.DataFrame:
     df = run_query(TOP_VOLATILE_QUERY)
@@ -206,51 +246,97 @@ def get_anomalies_data() -> pd.DataFrame:
     return df
 
 
-def safe_metric(value, default="-"):
-    if value is None:
-        return default
-    if isinstance(value, float):
-        return f"{value:.2f}"
-    return value
+def fmt_num(x, digits=2):
+    if pd.isna(x):
+        return "-"
+    return f"{float(x):,.{digits}f}"
 
 
+def build_dark_figure(fig, height=420):
+    fig.update_layout(
+        height=height,
+        plot_bgcolor="#0b0f16",
+        paper_bgcolor="#0b0f16",
+        font=dict(color="white"),
+        margin=dict(l=10, r=10, t=20, b=10),
+        legend_title_text="",
+    )
+    fig.update_xaxes(showgrid=False, zeroline=False)
+    fig.update_yaxes(showgrid=False, zeroline=False)
+    return fig
+
+
+# --------------------------------------------------
+# Data
+# --------------------------------------------------
 df = get_anomalies_data()
 
 st.markdown('<div class="app-shell">', unsafe_allow_html=True)
 
-# --------------------------------------------------
-# Hero
-# --------------------------------------------------
-st.markdown("""
-<div class="hero-card">
-    <div class="eyebrow">MIGROS • PRICE INTELLIGENCE</div>
-    <div class="hero-title">Anomalies</div>
-    <div class="hero-subtitle">Monitor volatile products, unusual price movements, and potential outliers in trusted price observations.</div>
-</div>
-""", unsafe_allow_html=True)
-
-st.markdown("""
-<div class="nav-row">
-    <div class="nav-pill">Overview</div>
-    <div class="nav-pill">Trend analysis</div>
-    <div class="nav-pill">Top movers</div>
-    <div class="nav-pill active">Anomalies</div>
-    <div class="nav-pill">Pipeline health</div>
-</div>
-""", unsafe_allow_html=True)
-
-# --------------------------------------------------
-# Empty state
-# --------------------------------------------------
 if df.empty:
     st.markdown("""
-    <div class="empty-box">
-        <div class="section-title">No anomaly data available yet</div>
-        <div class="section-subtitle">Run the pipeline and refresh marts to populate volatility analysis.</div>
+    <div class="hero-card">
+        <div class="eyebrow">MIGROS • PRICE INTELLIGENCE</div>
+        <div class="hero-title">Anomalies</div>
+        <div class="hero-subtitle">No anomaly data available yet. Run the pipeline and refresh marts to populate volatility analysis.</div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
+
+# --------------------------------------------------
+# Derivations
+# --------------------------------------------------
+df = df.copy()
+df["volatility"] = pd.to_numeric(df["volatility"], errors="coerce")
+df["avg_price_per_unit"] = pd.to_numeric(df["avg_price_per_unit"], errors="coerce")
+df["observation_count"] = pd.to_numeric(df["observation_count"], errors="coerce")
+
+top_row = df.sort_values("volatility", ascending=False).iloc[0]
+top_product = top_row["standardized_product_name"]
+top_volatility = top_row["volatility"]
+top_category = top_row["category_name"]
+top_level = top_row["volatility_level"]
+
+volatile_count = len(df)
+high_count = int((df["volatility_level"] == "high").sum())
+avg_volatility = df["volatility"].mean()
+latest_snapshot = "Apr 10, 2026"
+
+# --------------------------------------------------
+# Hero
+# --------------------------------------------------
+st.markdown(f"""
+<div class="hero-wrap">
+    <div class="hero-card">
+        <div class="eyebrow">MIGROS • PRICE INTELLIGENCE</div>
+        <div class="hero-title">Anomalies</div>
+        <div class="hero-subtitle">
+            Detect unusually volatile products using price variability across trusted observations — {latest_snapshot}
+        </div>
+    </div>
+    <div class="hero-badges">
+        <div class="status-pill pill-success">High risk {high_count}</div>
+        <div class="status-pill pill-info">Top volatility ₺{fmt_num(top_volatility, 1)}</div>
+        <div class="status-pill pill-dark">{latest_snapshot}</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+# --------------------------------------------------
+# Nav
+# --------------------------------------------------
+st.markdown("""
+<div class="nav-row">
+    <div class="nav-links">
+        <div class="nav-pill">Overview</div>
+        <div class="nav-pill">Trend analysis</div>
+        <div class="nav-pill">Top movers</div>
+        <div class="nav-pill active">Anomalies</div>
+        <div class="nav-pill">Pipeline health</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # --------------------------------------------------
 # Filters
@@ -272,58 +358,59 @@ if filtered_df.empty:
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# --------------------------------------------------
-# Summary metrics
-# --------------------------------------------------
-top_row = filtered_df.sort_values("volatility", ascending=False).iloc[0]
-volatile_count = len(filtered_df)
-high_count = int((filtered_df["volatility_level"] == "high").sum()) if "volatility_level" in filtered_df.columns else 0
-avg_volatility = float(filtered_df["volatility"].mean()) if "volatility" in filtered_df.columns else None
+filtered_top = filtered_df.sort_values("volatility", ascending=False).iloc[0]
 
-m1, m2, m3, m4 = st.columns(4)
+# --------------------------------------------------
+# KPI Cards
+# --------------------------------------------------
+c1, c2, c3, c4 = st.columns(4)
 
-with m1:
+with c1:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Volatile Products</div>
-        <div class="metric-value">{volatile_count}</div>
-        <div class="metric-help">Products with enough observations for anomaly analysis</div>
+        <div class="metric-value">{len(filtered_df)}</div>
+        <div class="metric-help">Products included in anomaly analysis</div>
     </div>
     """, unsafe_allow_html=True)
 
-with m2:
+with c2:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Highest Volatility</div>
-        <div class="metric-value">₺{safe_metric(top_row.get("volatility"), "0.00")}</div>
-        <div class="metric-help">{top_row.get("standardized_product_name", "-")}</div>
+        <div class="metric-value">₺{fmt_num(filtered_top["volatility"], 1)}</div>
+        <div class="metric-help">{filtered_top["standardized_product_name"]}</div>
     </div>
     """, unsafe_allow_html=True)
 
-with m3:
+with c3:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">Average Volatility</div>
-        <div class="metric-value">₺{safe_metric(avg_volatility, "0.00")}</div>
-        <div class="metric-help">Average standard deviation across filtered products</div>
+        <div class="metric-value">₺{fmt_num(filtered_df["volatility"].mean(), 1)}</div>
+        <div class="metric-help">Mean volatility across filtered products</div>
     </div>
     """, unsafe_allow_html=True)
 
-with m4:
+with c4:
     st.markdown(f"""
     <div class="metric-card">
         <div class="metric-label">High Risk Group</div>
-        <div class="metric-value">{high_count}</div>
+        <div class="metric-value">{int((filtered_df["volatility_level"] == "high").sum())}</div>
         <div class="metric-help">Products classified as high volatility</div>
     </div>
     """, unsafe_allow_html=True)
 
+# --------------------------------------------------
+# Insight Banner
+# --------------------------------------------------
 st.markdown(
     f"""
     <div class="info-banner">
-        Latest anomaly highlight: <strong>{top_row.get("standardized_product_name", "-")}</strong>
-        in <strong>{top_row.get("category_name", "-")}</strong> with volatility level
-        <strong>{top_row.get("volatility_level", "-")}</strong>.
+        Most volatile product: <strong>{filtered_top["standardized_product_name"]}</strong>
+        in <strong>{filtered_top["category_name"]}</strong> with
+        <strong>{filtered_top["volatility_level"]}</strong> anomaly level and
+        volatility score of <strong>₺{fmt_num(filtered_top["volatility"], 1)}</strong>.
     </div>
     """,
     unsafe_allow_html=True,
@@ -337,38 +424,34 @@ st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
 # --------------------------------------------------
 # Charts
 # --------------------------------------------------
-left_col, right_col = st.columns([1.2, 1])
+left_col, right_col = st.columns([1.25, 1])
 
 with left_col:
     st.markdown('<div class="section-title">Most Volatile Products</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subtitle">Top products ranked by price volatility</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-subtitle">Top products ranked by volatility score</div>', unsafe_allow_html=True)
 
-    top_n = filtered_df.sort_values("volatility", ascending=False).head(10).copy()
+    top10 = filtered_df.sort_values("volatility", ascending=False).head(10).copy()
 
     fig_bar = px.bar(
-        top_n,
+        top10.sort_values("volatility", ascending=True),
         x="volatility",
         y="standardized_product_name",
         color="volatility_level",
         orientation="h",
         hover_data=["avg_price_per_unit", "observation_count", "category_name"],
+        color_discrete_map={
+            "high": "#7cb5ec",
+            "medium": "#2f7ed8",
+            "low": "#f7a6a6",
+        },
     )
-    fig_bar.update_layout(
-        height=430,
-        plot_bgcolor="#0b0f16",
-        paper_bgcolor="#0b0f16",
-        font=dict(color="white"),
-        margin=dict(l=10, r=10, t=10, b=10),
-        xaxis_title="Volatility",
-        yaxis_title="",
-        legend_title_text="Risk Level",
-        yaxis=dict(categoryorder="total ascending"),
-    )
+    fig_bar = build_dark_figure(fig_bar, height=470)
+    fig_bar.update_layout(xaxis_title="Volatility", yaxis_title="")
     st.plotly_chart(fig_bar, use_container_width=True)
 
 with right_col:
-    st.markdown('<div class="section-title">Volatility Distribution</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-subtitle">How products are distributed across anomaly severity levels</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Volatility Level Distribution</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-subtitle">Breakdown of anomaly severity groups</div>', unsafe_allow_html=True)
 
     level_counts = (
         filtered_df["volatility_level"]
@@ -382,16 +465,16 @@ with right_col:
         level_counts,
         names="volatility_level",
         values="count",
-        hole=0.45,
+        hole=0.55,
+        color="volatility_level",
+        color_discrete_map={
+            "high": "#7cb5ec",
+            "medium": "#2f7ed8",
+            "low": "#f7a6a6",
+            "unknown": "#bfc7d5",
+        },
     )
-    fig_pie.update_layout(
-        height=430,
-        plot_bgcolor="#0b0f16",
-        paper_bgcolor="#0b0f16",
-        font=dict(color="white"),
-        margin=dict(l=10, r=10, t=10, b=10),
-        legend_title_text="Level",
-    )
+    fig_pie = build_dark_figure(fig_pie, height=470)
     st.plotly_chart(fig_pie, use_container_width=True)
 
 # --------------------------------------------------
@@ -400,10 +483,10 @@ with right_col:
 st.markdown('<div class="section-bar"></div>', unsafe_allow_html=True)
 
 # --------------------------------------------------
-# Detail table
+# Table
 # --------------------------------------------------
 st.markdown('<div class="section-title">Detailed Anomaly Table</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-subtitle">Analytics-ready anomaly output for deeper inspection and validation</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-subtitle">Detailed volatility output for inspection and validation</div>', unsafe_allow_html=True)
 
 display_df = filtered_df.sort_values("volatility", ascending=False).copy()
 
@@ -416,8 +499,9 @@ preferred_cols = [
     "volatility_level",
 ]
 
-existing_cols = [col for col in preferred_cols if col in display_df.columns]
-display_df = display_df[existing_cols]
+display_df = display_df[preferred_cols].copy()
+display_df["avg_price_per_unit"] = display_df["avg_price_per_unit"].map(lambda x: f"₺{fmt_num(x, 2)}")
+display_df["volatility"] = display_df["volatility"].map(lambda x: f"₺{fmt_num(x, 2)}")
 
 st.dataframe(display_df, use_container_width=True, hide_index=True)
 
