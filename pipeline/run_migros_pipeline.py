@@ -18,11 +18,7 @@ from pipeline.quality import log_quality_check
 from pipeline.run_lifecycle import fail_run, finish_run, start_run
 from pipeline.transforms import transform_product
 from scraper.migros.categories import get_migros_category_products
-from scraper.migros.config import (
-    MIGROS_CATEGORY_MAP,
-    MIGROS_CURRENCY,
-    MIGROS_SOURCE_NAME,
-)
+from config.retailers import RETAILER_CONFIG
 
 load_dotenv()
 
@@ -41,6 +37,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_CATEGORY_KEY = "fruit_veg"
 PIPELINE_VERSION = "v2-prep-002"
 
+source_name = RETAILER_CONFIG["migros"]["source_name"]
+currency = RETAILER_CONFIG["migros"]["currency"]
 
 # ---------------------------------------------------------------------------
 # Per-product insert
@@ -65,8 +63,8 @@ def process_product(
             run_id,
             product,
             category_slug,
-            source_name=MIGROS_SOURCE_NAME,
-            currency=MIGROS_CURRENCY,
+            source_name=source_name,
+            currency=currency,
         )
 
         # 2) STG SOURCE
@@ -75,7 +73,7 @@ def process_product(
             event_id,
             run_id,
             product,
-            source_name=MIGROS_SOURCE_NAME,
+            source_name=source_name,
         )
 
         # 3) TRANSFORM
@@ -95,7 +93,7 @@ def process_product(
             run_id,
             product,
             transformed,
-            source_name=MIGROS_SOURCE_NAME,
+            source_name=source_name,
         )
 
         # 6) STG OBSERVATION
@@ -105,8 +103,8 @@ def process_product(
             run_id,
             product,
             transformed,
-            source_name=MIGROS_SOURCE_NAME,
-            currency=MIGROS_CURRENCY,
+            source_name=source_name,
+            currency=currency,
         )
 
         # 7) FACT
@@ -117,7 +115,7 @@ def process_product(
             product,
             transformed,
             product_id,
-            source_name=MIGROS_SOURCE_NAME,
+            source_name=source_name,
         )
 
         # 8) COMMIT
@@ -160,13 +158,13 @@ def process_product(
 # Main pipeline
 # ---------------------------------------------------------------------------
 def run_pipeline(category_key: str = DEFAULT_CATEGORY_KEY):
-    if category_key not in MIGROS_CATEGORY_MAP:
-        valid_keys = ", ".join(MIGROS_CATEGORY_MAP.keys())
+    if category_key not in RETAILER_CONFIG["migros"]["categories"]:
+        valid_keys = ", ".join(RETAILER_CONFIG["migros"]["categories"].keys())
         raise ValueError(
             f"Invalid category_key={category_key!r}. Valid options: {valid_keys}"
         )
 
-    category_slug = MIGROS_CATEGORY_MAP[category_key]
+    category_slug = RETAILER_CONFIG["migros"]["categories"][category_key]
 
     conn = None
     run_id = None
@@ -178,7 +176,7 @@ def run_pipeline(category_key: str = DEFAULT_CATEGORY_KEY):
         with conn.cursor() as cur:
             run_id = start_run(
                 cur,
-                source_name=MIGROS_SOURCE_NAME,
+                source_name=source_name,
                 category_key=category_key,
                 category_slug=category_slug,
                 triggered_by="github_actions",
@@ -204,7 +202,7 @@ def run_pipeline(category_key: str = DEFAULT_CATEGORY_KEY):
                     "fail",
                     0,
                     1,
-                    f"No products returned for retailer={MIGROS_SOURCE_NAME} category_key={category_key}",
+                    f"No products returned for retailer={source_name} category_key={category_key}",
                 )
                 fail_run(
                     cur,
