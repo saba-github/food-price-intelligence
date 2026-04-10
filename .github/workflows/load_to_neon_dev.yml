@@ -66,4 +66,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
           PYTHONPATH: ${{ github.workspace }}
-        run: python pipeline/run_migros_pipeline.py --category ${{ matrix.category }}
+        run: python pipeline/run_pipeline.py --retailer migros --category ${{ matrix.category }}
