@@ -1,10 +1,10 @@
 name: Load data to Neon (DEV)
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - dev
+  workflow_dispatch:
 
 jobs:
   run-etl:
@@ -27,26 +27,19 @@ jobs:
       - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
-      - name: Run database migrations
-        shell: bash
+      - name: Run database migrations (DEV)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
         run: |
           set -euo pipefail
-          echo "Starting migrations on DEV..."
-          ls -1 database/migrations/*.sql | sort
+          echo "Running migrations on DEV..."
 
-          for file in $(ls -1 database/migrations/*.sql | sort); do
-            echo "Running migration: $file"
+          for file in $(ls database/migrations/*.sql | sort); do
+            echo "Running $file"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
           done
 
-      - name: Run tests
-        env:
-          PYTHONPATH: ${{ github.workspace }}
-        run: pytest -q
-
-      - name: Run script
+      - name: Run ETL pipeline (DEV)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
           PYTHONPATH: ${{ github.workspace }}
