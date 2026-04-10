@@ -185,3 +185,52 @@ from ops_data_quality_results
 order by quality_id desc
 limit 20
 """
+
+
+CROSS_RETAILER_PRODUCTS_QUERY = """
+SELECT DISTINCT standardized_product_name
+FROM mart_daily_prices_by_retailer
+WHERE standardized_product_name IS NOT NULL
+ORDER BY standardized_product_name;
+"""
+
+CROSS_RETAILER_COMPARISON_QUERY = """
+SELECT
+    date,
+    source_name,
+    standardized_product_name,
+    avg_price,
+    observation_count
+FROM mart_daily_prices_by_retailer
+WHERE standardized_product_name = %s
+ORDER BY date, source_name;
+"""
+
+CHEAPEST_RETAILER_TODAY_QUERY = """
+WITH latest_date AS (
+    SELECT MAX(date) AS max_date
+    FROM mart_daily_prices_by_retailer
+),
+ranked AS (
+    SELECT
+        m.date,
+        m.standardized_product_name,
+        m.source_name,
+        m.avg_price,
+        RANK() OVER (
+            PARTITION BY m.date, m.standardized_product_name
+            ORDER BY m.avg_price ASC
+        ) AS price_rank
+    FROM mart_daily_prices_by_retailer m
+    JOIN latest_date ld
+      ON m.date = ld.max_date
+)
+SELECT
+    date,
+    standardized_product_name,
+    source_name,
+    avg_price
+FROM ranked
+WHERE price_rank = 1
+ORDER BY standardized_product_name;
+"""
