@@ -33,7 +33,10 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
         run: |
           set -euo pipefail
+          echo "Running migrations on DEV..."
+
           for file in $(ls database/migrations/*.sql | sort); do
+            echo "Running $file"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
           done
 
