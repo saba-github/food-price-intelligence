@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  run-etl:
+  migrate-dev:
     runs-on: ubuntu-latest
 
     steps:
@@ -39,8 +39,31 @@ jobs:
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
           done
 
+  run-etl:
+    needs: migrate-dev
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        category: [fruit_veg, dairy_breakfast, beverages]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
       - name: Run ETL pipeline (DEV)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
           PYTHONPATH: ${{ github.workspace }}
-        run: python pipeline/run_migros_pipeline.py
+        run: python pipeline/run_migros_pipeline.py --category ${{ matrix.category }}
