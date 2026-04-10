@@ -9,8 +9,17 @@ def main():
     parser.add_argument("--category", required=True)
     args = parser.parse_args()
 
+    from pipeline.run_a101_pipeline import run_pipeline as run_a101_pipeline
+
     if args.retailer == "migros":
         run_migros_pipeline(args.category)
+
+    elif args.retailer == "a101":
+        run_a101_pipeline(args.category)
+
+    else:
+        raise ValueError(f"Retailer not implemented yet: {args.retailer}")
+    
     else:
         raise ValueError(f"Unsupported retailer: {args.retailer}")
 
