@@ -11,8 +11,13 @@ def main():
 
     if args.retailer == "migros":
         run_migros_pipeline(args.category)
+
+    elif args.retailer == "a101":
+        from pipeline.run_a101_pipeline import run_pipeline as run_a101_pipeline
+        run_a101_pipeline(args.category)
+
     else:
-        raise ValueError(f"Unsupported retailer: {args.retailer}")
+        raise ValueError(f"Retailer not implemented yet: {args.retailer}")
 
 
 if __name__ == "__main__":

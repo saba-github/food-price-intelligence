@@ -1,3 +1,6 @@
+from typing import Optional
+
+
 def log_quality_check(
     cursor,
     run_id: int,
@@ -5,7 +8,7 @@ def log_quality_check(
     check_status: str,
     observed_value=None,
     threshold_value=None,
-    details: str | None = None,
+    details: Optional[str] = None,
 ):
     cursor.execute(
         """

@@ -1,7 +1,10 @@
+from typing import Optional
+
+
 def get_or_create_product_id(
     cursor,
     standardized_product_name: str,
-    category_name: str | None,
+    category_name: Optional[str],
 ) -> int:
     if not standardized_product_name:
         raise ValueError("standardized_product_name cannot be empty")
