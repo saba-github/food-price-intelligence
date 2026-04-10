@@ -1,14 +1,10 @@
-name: Load data to Neon (DEV)
-
-on:
-  push:
-    branches:
-      - dev
-  workflow_dispatch:
-
 jobs:
   run-etl:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        category: [fruit_veg, dairy_breakfast, beverages]
 
     steps:
       - name: Checkout repo
@@ -24,23 +20,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
-      - name: Run database migrations (DEV)
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
-        run: |
-          set -euo pipefail
-          echo "Running migrations on DEV..."
-
-          for file in $(ls database/migrations/*.sql | sort); do
-            echo "Running $file"
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
-          done
-
-      - name: Run ETL pipeline (DEV)
+      - name: Run ETL
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
           PYTHONPATH: ${{ github.workspace }}
-        run: python pipeline/run_migros_pipeline.py
+        run: python pipeline/run_migros_pipeline.py --category ${{ matrix.category }}
