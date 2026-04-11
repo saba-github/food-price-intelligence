@@ -60,7 +60,26 @@ def insert_fact_observation(
 
     cursor.execute(
         """
+        SELECT event_id
+        FROM stg_price_observations
+        WHERE observation_id = %s
+        LIMIT 1
+        """,
+        (observation_id,),
+    )
+    event_row = cursor.fetchone()
+
+    if not event_row or event_row[0] is None:
+        raise ValueError(
+            f"Could not resolve event_id for observation_id={observation_id}"
+        )
+
+    event_id = event_row[0]
+
+    cursor.execute(
+        """
         INSERT INTO fact_price_observations (
+            event_id,
             observation_id,
             run_id,
             source_name,
@@ -81,10 +100,11 @@ def insert_fact_observation(
             category_name,
             observed_at
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT DO NOTHING
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (event_id) DO NOTHING
         """,
         (
+            event_id,
             observation_id,
             run_id,
             source_name,
