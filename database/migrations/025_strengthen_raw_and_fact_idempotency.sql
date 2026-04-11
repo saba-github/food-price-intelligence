@@ -1,30 +1,52 @@
 -- 025_strengthen_raw_and_fact_idempotency.sql
 
 -- RAW: move idempotency key from timestamp-based uniqueness to deterministic content hash.
-
 DROP INDEX IF EXISTS uniq_raw_event;
 
--- If historical duplicates exist for the same raw business event, keep earliest row.
-WITH ranked_raw AS (
+-- Build a canonical mapping for duplicated raw events.
+WITH raw_canonical AS (
     SELECT
         event_id,
-        ROW_NUMBER() OVER (
+        source_name,
+        raw_hash,
+        MIN(event_id) OVER (
             PARTITION BY source_name, raw_hash
-            ORDER BY event_id
-        ) AS rn
+        ) AS canonical_event_id
     FROM raw_price_events
     WHERE raw_hash IS NOT NULL
+),
+
+-- Re-point child tables to the canonical raw event first.
+updated_stg_source_products AS (
+    UPDATE stg_source_products sp
+    SET event_id = rc.canonical_event_id
+    FROM raw_canonical rc
+    WHERE sp.event_id = rc.event_id
+      AND rc.event_id <> rc.canonical_event_id
+    RETURNING sp.event_id
+),
+
+updated_stg_price_observations AS (
+    UPDATE stg_price_observations s
+    SET event_id = rc.canonical_event_id
+    FROM raw_canonical rc
+    WHERE s.event_id = rc.event_id
+      AND rc.event_id <> rc.canonical_event_id
+    RETURNING s.observation_id
 )
+
+-- Now delete only non-canonical duplicate raw rows.
 DELETE FROM raw_price_events r
-USING ranked_raw rr
-WHERE r.event_id = rr.event_id
-  AND rr.rn > 1;
+USING raw_canonical rc
+WHERE r.event_id = rc.event_id
+  AND rc.event_id <> rc.canonical_event_id;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_raw_event_hash
 ON raw_price_events (
     source_name,
     raw_hash
 );
+
 -- FACT: add event_id lineage key and enforce one fact row per raw event.
 ALTER TABLE fact_price_observations
 ADD COLUMN IF NOT EXISTS event_id INTEGER;
