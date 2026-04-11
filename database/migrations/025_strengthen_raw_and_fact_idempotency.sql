@@ -1,14 +1,30 @@
 -- 025_strengthen_raw_and_fact_idempotency.sql
 
 -- RAW: move idempotency key from timestamp-based uniqueness to deterministic content hash.
+
 DROP INDEX IF EXISTS uniq_raw_event;
+
+-- If historical duplicates exist for the same raw business event, keep earliest row.
+WITH ranked_raw AS (
+    SELECT
+        event_id,
+        ROW_NUMBER() OVER (
+            PARTITION BY source_name, raw_hash
+            ORDER BY event_id
+        ) AS rn
+    FROM raw_price_events
+    WHERE raw_hash IS NOT NULL
+)
+DELETE FROM raw_price_events r
+USING ranked_raw rr
+WHERE r.event_id = rr.event_id
+  AND rr.rn > 1;
 
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_raw_event_hash
 ON raw_price_events (
     source_name,
     raw_hash
 );
-
 -- FACT: add event_id lineage key and enforce one fact row per raw event.
 ALTER TABLE fact_price_observations
 ADD COLUMN IF NOT EXISTS event_id INTEGER;
