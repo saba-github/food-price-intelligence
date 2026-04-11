@@ -13,7 +13,7 @@ SELECT
 FROM raw_price_events
 WHERE raw_hash IS NOT NULL;
 
--- 2️⃣ Önce child tabloları güncelle
+-- 2️⃣ TÜM child tabloları update et
 
 UPDATE stg_source_products sp
 SET event_id = rc.canonical_event_id
@@ -26,6 +26,14 @@ SET event_id = rc.canonical_event_id
 FROM tmp_raw_canonical rc
 WHERE s.event_id = rc.event_id
   AND rc.event_id <> rc.canonical_event_id;
+
+-- 🔥 YENİ EKLENEN (KRİTİK)
+UPDATE stg_normalized_observations s
+SET event_id = rc.canonical_event_id
+FROM tmp_raw_canonical rc
+WHERE s.event_id = rc.event_id
+  AND rc.event_id <> rc.canonical_event_id;
+
 
 -- 3️⃣ ŞİMDİ raw duplicate sil
 
