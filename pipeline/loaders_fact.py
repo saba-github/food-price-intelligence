@@ -82,8 +82,7 @@ def insert_fact_observation(
             observed_at
         )
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (source_name, source_product_id, observed_at)
-        DO NOTHING
+        ON CONFLICT DO NOTHING
         """,
         (
             observation_id,

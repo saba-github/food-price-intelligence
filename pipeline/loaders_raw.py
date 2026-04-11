@@ -38,8 +38,7 @@ def insert_raw_event(
             (run_id, source_name, source_product_id, source_sku, category_slug,
              product_name, product_url, price, currency, scraped_at, raw_hash, raw_payload)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT (source_name, source_product_id, scraped_at)
-        DO NOTHING
+        ON CONFLICT DO NOTHING
         RETURNING event_id
         """,
         (
@@ -66,14 +65,12 @@ def insert_raw_event(
         SELECT event_id
         FROM raw_price_events
         WHERE source_name = %s
-          AND source_product_id = %s
-          AND scraped_at = %s
+          AND raw_hash = %s
         LIMIT 1
         """,
         (
             source_name,
-            source_product_id,
-            scraped_at,
+            raw_hash,
         ),
     )
     existing_row = cursor.fetchone()
