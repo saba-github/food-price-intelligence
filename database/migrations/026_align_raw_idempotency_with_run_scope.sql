@@ -1,5 +1,7 @@
 -- 026_align_raw_idempotency_with_run_scope.sql
-
+-- FIX: remove rows with null raw_hash before constraint
+DELETE FROM raw_price_events
+WHERE raw_hash IS NULL;
 -- 1) raw_hash should never be null going forward
 ALTER TABLE raw_price_events
 ALTER COLUMN raw_hash SET NOT NULL;
