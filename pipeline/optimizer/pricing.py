@@ -1,3 +1,12 @@
+def get_selected_price(price_info: dict) -> int | float | None:
+    selected_price = price_info.get("price_per_unit")
+
+    if selected_price is None:
+        selected_price = price_info.get("price")
+
+    return selected_price
+
+
 def get_latest_prices(cursor, product_id: int) -> list[dict]:
     cursor.execute(
         """
@@ -27,13 +36,13 @@ def get_cheapest_price(prices: list[dict]) -> dict | None:
     valid_prices = [
         price_info
         for price_info in prices
-        if price_info.get("price_per_unit") is not None
+        if get_selected_price(price_info) is not None
     ]
 
     if not valid_prices:
         return None
 
-    return min(valid_prices, key=lambda price_info: price_info["price_per_unit"])
+    return min(valid_prices, key=get_selected_price)
 
 
 def calculate_split_basket(cursor, product_ids: list[int]) -> dict:
@@ -47,18 +56,20 @@ def calculate_split_basket(cursor, product_ids: list[int]) -> dict:
         if cheapest is None:
             continue
 
-        item_price = cheapest.get("price")
+        selected_price = get_selected_price(cheapest)
 
         items.append(
             {
                 "product_id": product_id,
                 "market": cheapest["source_name"],
-                "price": item_price,
+                "price": cheapest.get("price"),
+                "price_per_unit": cheapest.get("price_per_unit"),
+                "selected_price": selected_price,
             }
         )
 
-        if item_price is not None:
-            total_price += item_price
+        if selected_price is not None:
+            total_price += selected_price
 
     return {
         "items": items,
