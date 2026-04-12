@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 import psycopg2
 import streamlit as st
 
@@ -44,7 +45,15 @@ if st.button("Optimize Basket"):
             st.write(result["input"])
 
             st.subheader("Matched Products")
-            st.dataframe(result["matched_products"], width="stretch")
+            matched_df = pd.DataFrame(result["matched_products"])
+
+            if not matched_df.empty and "found" in matched_df.columns:
+                missing_df = matched_df[matched_df["found"] == False]
+                if not missing_df.empty:
+                    missing_inputs = ", ".join(missing_df["input"].astype(str).tolist())
+                    st.warning(f"Could not match: {missing_inputs}")
+
+            st.dataframe(matched_df, width="stretch")
 
             st.subheader("Split Basket Items")
             st.dataframe(split_basket["items"], width="stretch")

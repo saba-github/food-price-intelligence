@@ -6,13 +6,17 @@ from pipeline.optimizer.pricing import (
 
 
 def optimize_basket(cursor, user_inputs: list[str]) -> dict:
-    matched_products = [
-        {
-            "input": user_input,
-            "product_id": find_product_id(cursor, user_input),
-        }
-        for user_input in user_inputs
-    ]
+    matched_products = []
+
+    for user_input in user_inputs:
+        product_id = find_product_id(cursor, user_input)
+        matched_products.append(
+            {
+                "input": user_input,
+                "product_id": product_id,
+                "found": product_id is not None,
+            }
+        )
 
     product_ids = [
         item["product_id"]
