@@ -1,5 +1,4 @@
 -- 026_align_raw_idempotency_with_run_scope.sql
--- FIX: remove rows with null raw_hash before constraint
 -- FIX: fill null raw_hash instead of deleting (to preserve FK integrity)
 UPDATE raw_price_events
 SET raw_hash = md5(
