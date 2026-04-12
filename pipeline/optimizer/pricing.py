@@ -45,6 +45,49 @@ def get_cheapest_price(prices: list[dict]) -> dict | None:
     return min(valid_prices, key=get_selected_price)
 
 
+def calculate_single_market_basket(cursor, product_ids: list[int]) -> list[dict]:
+    market_totals = {}
+    required_items_count = len(product_ids)
+
+    for product_id in product_ids:
+        prices = get_latest_prices(cursor, product_id)
+        best_prices_by_market = {}
+
+        for price_info in prices:
+            selected_price = get_selected_price(price_info)
+
+            if selected_price is None:
+                continue
+
+            market = price_info["source_name"]
+            current_best = best_prices_by_market.get(market)
+
+            if current_best is None or selected_price < current_best["selected_price"]:
+                best_prices_by_market[market] = {
+                    "selected_price": selected_price,
+                }
+
+        for market, market_price_info in best_prices_by_market.items():
+            if market not in market_totals:
+                market_totals[market] = {
+                    "market": market,
+                    "items_count": 0,
+                    "total_price": 0,
+                }
+
+            market_totals[market]["items_count"] += 1
+            market_totals[market]["total_price"] += market_price_info["selected_price"]
+
+    return [
+        market_info
+        for market_info in sorted(
+            market_totals.values(),
+            key=lambda market_info: (market_info["total_price"], market_info["market"]),
+        )
+        if market_info["items_count"] == required_items_count
+    ]
+
+
 def calculate_split_basket(cursor, product_ids: list[int]) -> dict:
     items = []
     total_price = 0
