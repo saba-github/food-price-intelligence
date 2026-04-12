@@ -9,7 +9,7 @@ from pipeline.optimizer.engine import optimize_basket
 st.set_page_config(page_title="Shopping Optimizer", layout="wide")
 
 st.title("Shopping Optimizer")
-st.caption("Enter a shopping list and compare the cheapest basket distribution across markets.")
+st.caption("Enter a shopping list to compare split basket pricing against single market options.")
 
 user_text = st.text_area(
     "Shopping List",
@@ -36,18 +36,36 @@ if st.button("Optimize Basket"):
             cursor = conn.cursor()
 
             result = optimize_basket(cursor, user_inputs)
+            split_basket = result["split_basket"]
+            split_basket_total = split_basket["total_price"]
+            single_market_options = result["single_market_options"]
 
             st.subheader("Entered Products")
             st.write(result["input"])
 
             st.subheader("Matched Products")
-            st.dataframe(result["matched_products"], use_container_width=True)
+            st.dataframe(result["matched_products"], width="stretch")
 
-            st.subheader("Basket Items")
-            st.dataframe(result["basket"]["items"], use_container_width=True)
+            st.subheader("Split Basket Items")
+            st.dataframe(split_basket["items"], width="stretch")
 
-            st.subheader("Total Price")
-            st.metric("Total Price", result["basket"]["total_price"])
+            st.subheader("Split Basket Total")
+            st.metric("Split Basket Total", split_basket_total)
+
+            st.subheader("Single Market Options")
+
+            if single_market_options:
+                st.dataframe(single_market_options, width="stretch")
+
+                cheapest_single_market_total = min(
+                    option["total_price"]
+                    for option in single_market_options
+                )
+                savings = cheapest_single_market_total - split_basket_total
+
+                st.metric("Savings vs Cheapest Single Market", savings)
+            else:
+                st.info("No single market can fulfill all matched products.")
 
         except Exception as exc:
             st.error(str(exc))
