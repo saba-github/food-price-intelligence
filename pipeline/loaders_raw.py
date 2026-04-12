@@ -38,7 +38,7 @@ def insert_raw_event(
             (run_id, source_name, source_product_id, source_sku, category_slug,
              product_name, product_url, price, currency, scraped_at, raw_hash, raw_payload)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        ON CONFLICT DO NOTHING
+        ON CONFLICT (run_id, source_name, raw_hash) DO NOTHING
         RETURNING event_id
         """,
         (
@@ -64,16 +64,21 @@ def insert_raw_event(
         """
         SELECT event_id
         FROM raw_price_events
-        WHERE source_name = %s
+        WHERE run_id = %s
+          AND source_name = %s
           AND raw_hash = %s
         LIMIT 1
         """,
         (
+            run_id,
             source_name,
             raw_hash,
         ),
     )
     existing_row = cursor.fetchone()
     if not existing_row:
-        raise ValueError("Could not get event_id from raw_price_events after conflict.")
+        raise ValueError(
+            f"Could not get event_id from raw_price_events after conflict. "
+            f"run_id={run_id}, source_name={source_name}, raw_hash={raw_hash}"
+        )
     return existing_row[0]
