@@ -1,6 +1,13 @@
 -- 026_align_raw_idempotency_with_run_scope.sql
 -- FIX: remove rows with null raw_hash before constraint
-DELETE FROM raw_price_events
+-- FIX: fill null raw_hash instead of deleting (to preserve FK integrity)
+UPDATE raw_price_events
+SET raw_hash = md5(
+    coalesce(source_name, '') ||
+    coalesce(product_name, '') ||
+    coalesce(price::text, '') ||
+    coalesce(category_slug, '')
+)
 WHERE raw_hash IS NULL;
 -- 1) raw_hash should never be null going forward
 ALTER TABLE raw_price_events
