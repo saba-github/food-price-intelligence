@@ -1,18 +1,18 @@
 from pipeline.optimizer.matching import find_product_id
-from pipeline.optimizer.pricing import calculate_split_basket
+from pipeline.optimizer.pricing import (
+    calculate_single_market_basket,
+    calculate_split_basket,
+)
 
 
 def optimize_basket(cursor, user_inputs: list[str]) -> dict:
-    matched_products = []
-
-    for user_input in user_inputs:
-        product_id = find_product_id(cursor, user_input)
-        matched_products.append(
-            {
-                "input": user_input,
-                "product_id": product_id,
-            }
-        )
+    matched_products = [
+        {
+            "input": user_input,
+            "product_id": find_product_id(cursor, user_input),
+        }
+        for user_input in user_inputs
+    ]
 
     product_ids = [
         item["product_id"]
@@ -21,15 +21,18 @@ def optimize_basket(cursor, user_inputs: list[str]) -> dict:
     ]
 
     if product_ids:
-        basket = calculate_split_basket(cursor, product_ids)
+        split_basket = calculate_split_basket(cursor, product_ids)
+        single_market_options = calculate_single_market_basket(cursor, product_ids)
     else:
-        basket = {
+        split_basket = {
             "items": [],
             "total_price": 0,
         }
+        single_market_options = []
 
     return {
         "input": user_inputs,
         "matched_products": matched_products,
-        "basket": basket,
+        "split_basket": split_basket,
+        "single_market_options": single_market_options,
     }
