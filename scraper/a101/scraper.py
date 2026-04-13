@@ -7,10 +7,12 @@ def extract_unit_info(product_name: str):
         return None, None
 
     patterns = [
-        (r"(\d+(?:[.,]\d+)?)\s*(kg|KG|Kg)", "KG"),
-        (r"(\d+(?:[.,]\d+)?)\s*(g|G|gr|GR)", "GRAM"),
-        (r"(\d+(?:[.,]\d+)?)\s*(l|L|lt|LT)", "LITER"),
-        (r"(\d+(?:[.,]\d+)?)\s*(ml|ML)", "ML"),
+        (r"(\d+(?:[.,]\d+)?)\s*(kg|KG|Kg)\b", "KG"),
+        (r"(\d+(?:[.,]\d+)?)\s*(g|G|gr|GR)\b", "GRAM"),
+        (r"(\d+(?:[.,]\d+)?)\s*(l|L|lt|LT)\b", "LITER"),
+        (r"(\d+(?:[.,]\d+)?)\s*(ml|ML)\b", "ML"),
+        (r"(\d+(?:[.,]\d+)?)\s*(adet|Adet|ADET)\b", "PIECE"),
+        (r"(\d+(?:[.,]\d+)?)\s*(li|LI)\b", "PIECE"),
     ]
 
     for pattern, unit in patterns:
@@ -38,29 +40,65 @@ def is_valid_product_name(name: str) -> bool:
         "Aramak istediğin ürünü yaz",
         "Böyle bir sayfa bulamadık",
         "A101 Hep Ucuz",
+        "Kapıda",
+        "Teslimat",
+        "Seçtiğin mağaza",
     ]
 
+    lowered = name.lower().strip()
+
+    if len(lowered) < 3:
+        return False
+
     for fragment in invalid_fragments:
-        if fragment.lower() in name.lower():
+        if fragment.lower() in lowered:
             return False
+
+    if "₺" in lowered:
+        return False
 
     return True
 
 
 def parse_price_from_lines(lines):
+    price_pattern = re.compile(r"₺\s*([\d\.]+(?:,\d{1,2})?)")
+
+    prices = []
     for line in lines:
-        if "₺" in line:
-            raw_price = (
-                line.replace("₺", "")
-                .replace(".", "")
-                .replace(",", ".")
-                .strip()
-            )
+        matches = price_pattern.findall(line)
+        for match in matches:
+            raw_price = match.replace(".", "").replace(",", ".").strip()
             try:
-                return float(raw_price)
+                prices.append(float(raw_price))
             except ValueError:
                 continue
-    return None
+
+    if not prices:
+        return None
+
+    return min(prices)
+
+
+def clean_product_name(lines):
+    candidates = []
+
+    for line in lines:
+        line = line.strip()
+
+        if not is_valid_product_name(line):
+            continue
+
+        if re.search(r"\d+\s*(?:kg|g|gr|l|lt|ml|adet|li)\b", line, flags=re.IGNORECASE):
+            candidates.append(line)
+            continue
+
+        if not re.search(r"^\d+[.,]?\d*$", line) and "₺" not in line:
+            candidates.append(line)
+
+    if not candidates:
+        return None
+
+    return max(candidates, key=len).strip()
 
 
 def get_a101_products(category_slug: str):
@@ -68,11 +106,10 @@ def get_a101_products(category_slug: str):
     products = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=True)
         page = browser.new_page()
-        page.goto(url, timeout=60000)
+        page.goto(url, timeout=60000, wait_until="domcontentloaded")
 
-        # Konum popup
         for text in [
             "Bu defalık izin ver",
             "Siteyi ziyaret ederken izin ver",
@@ -84,7 +121,6 @@ def get_a101_products(category_slug: str):
             except Exception:
                 pass
 
-        # Cookie popup
         for text in ["KABUL ET", "Kabul Et", "Tümünü Kabul Et"]:
             try:
                 page.get_by_text(text, exact=True).click(timeout=3000)
@@ -92,14 +128,15 @@ def get_a101_products(category_slug: str):
             except Exception:
                 pass
 
-        page.wait_for_timeout(4000)
+        page.wait_for_timeout(3000)
 
-        # Lazy loading için scroll
-        for _ in range(8):
-            page.mouse.wheel(0, 2500)
-            page.wait_for_timeout(1200)
+        for _ in range(10):
+            page.mouse.wheel(0, 3000)
+            page.wait_for_timeout(1000)
 
-        cards = page.locator("div[class*='product']").all()
+        cards = page.locator("div[class*='product'], article, a[href*='/kapida/']").all()
+
+        seen_names = set()
 
         for i, card in enumerate(cards):
             try:
@@ -115,29 +152,29 @@ def get_a101_products(category_slug: str):
                 if price is None:
                     continue
 
-                name = None
-                for line in lines:
-                    if "₺" not in line and len(line) > 2:
-                        if is_valid_product_name(line):
-                            name = line
-                            break
-
+                name = clean_product_name(lines)
                 if not name:
                     continue
+
+                normalized_name = name.lower().strip()
+                if normalized_name in seen_names:
+                    continue
+
+                seen_names.add(normalized_name)
 
                 extracted_unit, extracted_amount = extract_unit_info(name)
 
                 products.append(
                     {
-                        "product_id": f"a101_{i}",
+                        "product_id": f"a101_{category_slug}_{i}",
                         "product_name": name,
-                        "sku": f"a101_{i}",
+                        "sku": f"a101_{category_slug}_{i}",
                         "shown_price_tl": price,
                         "regular_price_tl": price,
                         "discount_rate": None,
                         "product_url": url,
                         "brand_name": None,
-                        "category_name": "Meyve ve Sebze",
+                        "category_name": category_slug.replace("-", " ").title(),
                         "unit": extracted_unit,
                         "unit_amount": extracted_amount,
                     }
