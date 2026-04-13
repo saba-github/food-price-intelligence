@@ -1,3 +1,14 @@
+name: Load data to Neon (PROD)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "0 6 * * *"
+
+jobs:
   run-etl:
     runs-on: ubuntu-latest
 
