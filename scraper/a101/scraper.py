@@ -37,7 +37,7 @@ def normalize_category_name(category_slug: str) -> str:
     return category_slug.replace("-", " ").title()
 
 
-def get_section_header(category_slug: str) -> str:
+def get_section_header(category_slug: str) -> str | None:
     if category_slug.endswith("/meyve"):
         return "Meyve"
     if category_slug.endswith("/sebze"):
@@ -47,34 +47,61 @@ def get_section_header(category_slug: str) -> str:
     return None
 
 
+def is_price_line(text: str) -> bool:
+    return bool(re.match(r"^₺\s*[\d\.]+(?:,\d{1,2})?$", text))
+
+
+def find_best_section_start(lines: list[str], section_header: str) -> int | None:
+    """
+    Same header appears multiple times in the page.
+    Choose the occurrence that is followed by real product rows (price lines).
+    """
+    candidate_indices = [i for i, line in enumerate(lines) if line == section_header]
+
+    if not candidate_indices:
+        return None
+
+    best_idx = None
+    best_score = -1
+
+    for idx in candidate_indices:
+        window = lines[idx : idx + 80]
+        score = sum(1 for line in window if is_price_line(line))
+
+        # Prefer the first strong candidate with nearby prices
+        if score > best_score:
+            best_score = score
+            best_idx = idx
+
+    if best_score <= 0:
+        return None
+
+    return best_idx
+
+
 def parse_products_from_body_text(body_text: str, category_slug: str):
     lines = [line.strip() for line in body_text.splitlines() if line.strip()]
 
     section_header = get_section_header(category_slug)
     if not section_header:
+        print(f"DEBUG - section header missing for category_slug={category_slug}")
         return []
 
-    # İlgili bölümün başlangıcını bul
-    start_idx = None
-    for i, line in enumerate(lines):
-        if line == section_header:
-            start_idx = i
-            break
-
+    start_idx = find_best_section_start(lines, section_header)
     if start_idx is None:
-        print(f"DEBUG - section header not found: {section_header}")
+        print(f"DEBUG - section header not found or no priced rows nearby: {section_header}")
         return []
 
-    # Bir sonraki bölüm başlığına kadar git
     stop_headers = {"Meyve", "Sebze", "Yeşillik", "Sepetim", "Giriş Yap", "Site Haritası"}
-    section_lines = []
 
-    for line in lines[start_idx + 1:]:
+    section_lines = []
+    for line in lines[start_idx + 1 :]:
         if line in stop_headers and line != section_header:
             break
         section_lines.append(line)
 
     print(f"DEBUG - section_header={section_header}")
+    print(f"DEBUG - section_start_idx={start_idx}")
     print(f"DEBUG - section_lines_sample={section_lines[:40]}")
 
     products = []
@@ -85,10 +112,10 @@ def parse_products_from_body_text(body_text: str, category_slug: str):
         name = section_lines[i]
         next_line = section_lines[i + 1]
 
-        # fiyat satırı mı?
-        if re.match(r"^₺\s*[\d\.]+(?:,\d{1,2})?$", next_line):
-            # saçma satırları ele
+        if is_price_line(next_line):
             lowered = name.lower()
+
+            # obvious non-product lines
             if any(
                 x in lowered
                 for x in [
@@ -99,6 +126,7 @@ def parse_products_from_body_text(body_text: str, category_slug: str):
                     "site haritası",
                     "yardım",
                     "iletişim",
+                    "kategoriler",
                 ]
             ):
                 i += 1
