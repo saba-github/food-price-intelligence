@@ -12,7 +12,7 @@ def extract_unit_info(product_name: str):
         (r"(\d+(?:[.,]\d+)?)\s*(l|L|lt|LT)\b", "LITER"),
         (r"(\d+(?:[.,]\d+)?)\s*(ml|ML)\b", "ML"),
         (r"(\d+(?:[.,]\d+)?)\s*(adet|Adet|ADET)\b", "PIECE"),
-        (r"(\d+(?:[.,]\d+)?)\s*(li|LI)\b", "PIECE"),
+        (r"(\d+(?:[.,]\d+)?)\s*(li|LI|'lu|'lü)\b", "PIECE"),
     ]
 
     for pattern, unit in patterns:
@@ -25,6 +25,124 @@ def extract_unit_info(product_name: str):
                 return unit, None
 
     return None, None
+
+
+def normalize_category_name(category_slug: str) -> str:
+    if category_slug.endswith("/meyve"):
+        return "Meyve"
+    if category_slug.endswith("/sebze"):
+        return "Sebze"
+    if category_slug.endswith("/yesillik"):
+        return "Yesillik"
+    return category_slug.replace("-", " ").title()
+
+
+def get_section_header(category_slug: str) -> str:
+    if category_slug.endswith("/meyve"):
+        return "Meyve"
+    if category_slug.endswith("/sebze"):
+        return "Sebze"
+    if category_slug.endswith("/yesillik"):
+        return "Yeşillik"
+    return None
+
+
+def parse_products_from_body_text(body_text: str, category_slug: str):
+    lines = [line.strip() for line in body_text.splitlines() if line.strip()]
+
+    section_header = get_section_header(category_slug)
+    if not section_header:
+        return []
+
+    # İlgili bölümün başlangıcını bul
+    start_idx = None
+    for i, line in enumerate(lines):
+        if line == section_header:
+            start_idx = i
+            break
+
+    if start_idx is None:
+        print(f"DEBUG - section header not found: {section_header}")
+        return []
+
+    # Bir sonraki bölüm başlığına kadar git
+    stop_headers = {"Meyve", "Sebze", "Yeşillik", "Sepetim", "Giriş Yap", "Site Haritası"}
+    section_lines = []
+
+    for line in lines[start_idx + 1:]:
+        if line in stop_headers and line != section_header:
+            break
+        section_lines.append(line)
+
+    print(f"DEBUG - section_header={section_header}")
+    print(f"DEBUG - section_lines_sample={section_lines[:40]}")
+
+    products = []
+    seen_names = set()
+
+    i = 0
+    while i < len(section_lines) - 1:
+        name = section_lines[i]
+        next_line = section_lines[i + 1]
+
+        # fiyat satırı mı?
+        if re.match(r"^₺\s*[\d\.]+(?:,\d{1,2})?$", next_line):
+            # saçma satırları ele
+            lowered = name.lower()
+            if any(
+                x in lowered
+                for x in [
+                    "kampanyalar",
+                    "giriş yap",
+                    "sepetim",
+                    "anasayfa",
+                    "site haritası",
+                    "yardım",
+                    "iletişim",
+                ]
+            ):
+                i += 1
+                continue
+
+            raw_price = next_line.replace("₺", "").replace(".", "").replace(",", ".").strip()
+
+            try:
+                price = float(raw_price)
+            except ValueError:
+                i += 1
+                continue
+
+            normalized_name = name.lower().strip()
+            if normalized_name in seen_names:
+                i += 2
+                continue
+
+            seen_names.add(normalized_name)
+
+            extracted_unit, extracted_amount = extract_unit_info(name)
+
+            products.append(
+                {
+                    "product_id": f"a101_{category_slug}_{len(products)}",
+                    "product_name": name,
+                    "sku": f"a101_{category_slug}_{len(products)}",
+                    "shown_price_tl": price,
+                    "regular_price_tl": price,
+                    "discount_rate": None,
+                    "product_url": f"https://www.a101.com.tr/kapida/{category_slug}/",
+                    "brand_name": None,
+                    "category_name": normalize_category_name(category_slug),
+                    "unit": extracted_unit,
+                    "unit_amount": extracted_amount,
+                }
+            )
+
+            i += 2
+            continue
+
+        i += 1
+
+    return products
 
 
 def get_a101_products(category_slug: str):
@@ -94,87 +212,11 @@ def get_a101_products(category_slug: str):
         body_text = page.locator("body").inner_text()
         print(f"DEBUG - BODY TEXT SAMPLE: {body_text[:2000]}")
 
-        cards = page.locator("div[data-testid='product-card']").all()
-
-        print("DEBUG - USING SELECTOR: div[data-testid='product-card']")
-        print(f"DEBUG - TOTAL CARDS FOUND: {len(cards)}")
-
-        seen_names = set()
-
-        for i, card in enumerate(cards):
-            try:
-                name = card.locator("h3").inner_text().strip()
-
-                # Meyve-sebze dışı ürünleri ele
-                if any(
-                    x in name.lower()
-                    for x in [
-                        "süt",
-                        "peynir",
-                        "çikolata",
-                        "deterjan",
-                        "pirinç",
-                        "yumurta",
-                    ]
-                ):
-                    continue
-
-                price = None
-                candidate_texts = []
-
-                try:
-                    spans = card.locator("span").all_inner_texts()
-                    candidate_texts.extend(spans)
-                except Exception:
-                    pass
-
-                try:
-                    card_text = card.inner_text()
-                    candidate_texts.append(card_text)
-                except Exception:
-                    pass
-
-                for text in candidate_texts:
-                    matches = re.findall(r"₺\s*([\d\.]+(?:,\d{1,2})?)", text)
-                    if matches:
-                        raw_price = matches[0].replace(".", "").replace(",", ".").strip()
-                        try:
-                            price = float(raw_price)
-                            break
-                        except ValueError:
-                            continue
-
-                if price is None:
-                    continue
-
-                normalized_name = name.lower().strip()
-                if normalized_name in seen_names:
-                    continue
-                seen_names.add(normalized_name)
-
-                extracted_unit, extracted_amount = extract_unit_info(name)
-
-                products.append(
-                    {
-                        "product_id": f"a101_{category_slug}_{i}",
-                        "product_name": name,
-                        "sku": f"a101_{category_slug}_{i}",
-                        "shown_price_tl": price,
-                        "regular_price_tl": price,
-                        "discount_rate": None,
-                        "product_url": url,
-                        "brand_name": None,
-                        "category_name": category_slug.replace("-", " ").title(),
-                        "unit": extracted_unit,
-                        "unit_amount": extracted_amount,
-                    }
-                )
-
-            except Exception as e:
-                print(f"DEBUG - CARD ERROR {i}: {e}")
-                continue
+        products = parse_products_from_body_text(body_text, category_slug)
 
         print(f"DEBUG - TOTAL PRODUCTS RETURNED: {len(products)}")
+        if products:
+            print(f"DEBUG - FIRST 10 PRODUCTS: {[p['product_name'] for p in products[:10]]}")
 
         context.close()
         browser.close()
