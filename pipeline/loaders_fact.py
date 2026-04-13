@@ -43,9 +43,19 @@ def insert_fact_observation(
 
     if not can_insert:
         logger.info(
-            "Skipping fact insert — product=%r reason=%s",
+            (
+                "DEBUG - FACT SKIP | product=%r | reason=%s | "
+                "price=%r | normalized_unit=%r | normalized_quantity=%r | "
+                "price_per_unit=%r | standardized_product_name=%r | category_name=%r"
+            ),
             product.get("product_name"),
             reason,
+            transformed.get("price"),
+            transformed.get("normalized_unit"),
+            transformed.get("normalized_quantity"),
+            transformed.get("price_per_unit"),
+            transformed.get("standardized_product_name"),
+            transformed.get("category_name"),
         )
         return False
 
@@ -126,5 +136,12 @@ def insert_fact_observation(
             observed_at,
         ),
     )
+
+    if cursor.rowcount != 1:
+        logger.info(
+            "DEBUG - FACT NOT INSERTED | product=%r | reason=conflict_or_no_insert | event_id=%r",
+            product.get("product_name"),
+            event_id,
+        )
 
     return cursor.rowcount == 1
