@@ -1,16 +1,10 @@
-name: Load data to Neon (PROD)
-
-on:
-  workflow_dispatch:
-  push:
-    branches:
-      - main
-  schedule:
-    - cron: "0 6 * * *"
-
-jobs:
   run-etl:
     runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        category: [fruit_veg, dairy_breakfast, beverages]
 
     steps:
       - name: Checkout repo
@@ -45,4 +39,4 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
           PYTHONPATH: ${{ github.workspace }}
-        run: python pipeline/run_migros_pipeline.py
+        run: python -m pipeline.run_pipeline --retailer migros --category ${{ matrix.category }}
