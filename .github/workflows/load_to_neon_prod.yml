@@ -9,13 +9,8 @@ on:
     - cron: "0 6 * * *"
 
 jobs:
-  run-etl:
+  migrate-prod:
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        category: [fruit_veg, dairy_breakfast, beverages]
 
     steps:
       - name: Checkout repo
@@ -45,6 +40,29 @@ jobs:
             echo "Running $file"
             psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
           done
+
+  run-etl:
+    needs: migrate-prod
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        category: [fruit_veg, dairy_breakfast, beverages]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
 
       - name: Run ETL pipeline (PROD)
         env:
