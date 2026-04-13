@@ -1,8 +1,14 @@
 import os
+import sys
+from pathlib import Path
 
 import pandas as pd
 import psycopg2
 import streamlit as st
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.append(str(ROOT_DIR))
 
 from pipeline.optimizer.engine import optimize_basket
 
@@ -33,6 +39,13 @@ if st.button("Optimize Basket"):
 
         try:
             database_url = os.getenv("DATABASE_URL")
+
+            if not database_url:
+                database_url = st.secrets.get("DATABASE_URL")
+
+            if not database_url:
+                raise ValueError("DATABASE_URL is not set.")
+
             conn = psycopg2.connect(database_url)
             cursor = conn.cursor()
 
@@ -53,18 +66,18 @@ if st.button("Optimize Basket"):
                     missing_inputs = ", ".join(missing_df["input"].astype(str).tolist())
                     st.warning(f"Could not match: {missing_inputs}")
 
-            st.dataframe(matched_df, width="stretch")
+            st.dataframe(matched_df, use_container_width=True)
 
             st.subheader("Split Basket Items")
-            st.dataframe(split_basket["items"], width="stretch")
+            st.dataframe(pd.DataFrame(split_basket["items"]), use_container_width=True)
 
             st.subheader("Split Basket Total")
-            st.metric("Split Basket Total", split_basket_total)
+            st.metric("Split Basket Total", f"₺{split_basket_total:,.2f}")
 
             st.subheader("Single Market Options")
 
             if single_market_options:
-                st.dataframe(single_market_options, width="stretch")
+                st.dataframe(pd.DataFrame(single_market_options), use_container_width=True)
 
                 cheapest_single_market_total = min(
                     option["total_price"]
@@ -72,7 +85,7 @@ if st.button("Optimize Basket"):
                 )
                 savings = cheapest_single_market_total - split_basket_total
 
-                st.metric("Savings vs Cheapest Single Market", savings)
+                st.metric("Savings vs Cheapest Single Market", f"₺{savings:,.2f}")
             else:
                 st.info("No single market can fulfill all matched products.")
 
