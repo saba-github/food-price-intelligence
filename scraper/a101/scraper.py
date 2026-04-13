@@ -106,10 +106,15 @@ def get_a101_products(category_slug: str):
     products = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        page = browser.new_page()
-        page.goto(url, timeout=60000, wait_until="domcontentloaded")
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page(viewport={"width": 1440, "height": 2200})
 
+        print(f"DEBUG - CATEGORY URL: {url}")
+
+        page.goto(url, timeout=60000, wait_until="domcontentloaded")
+        page.wait_for_timeout(5000)
+
+        # Location popup
         for text in [
             "Bu defalık izin ver",
             "Siteyi ziyaret ederken izin ver",
@@ -117,36 +122,62 @@ def get_a101_products(category_slug: str):
         ]:
             try:
                 page.get_by_text(text, exact=True).click(timeout=3000)
+                print(f"DEBUG - clicked location popup button: {text}")
                 break
             except Exception:
                 pass
 
+        # Cookie popup
         for text in ["KABUL ET", "Kabul Et", "Tümünü Kabul Et"]:
             try:
                 page.get_by_text(text, exact=True).click(timeout=3000)
+                print(f"DEBUG - clicked cookie popup button: {text}")
                 break
             except Exception:
                 pass
 
-        page.wait_for_timeout(3000)
+        page.wait_for_timeout(4000)
 
-        for _ in range(10):
+        for i in range(10):
             page.mouse.wheel(0, 3000)
-            page.wait_for_timeout(1000)
+            page.wait_for_timeout(1200)
+            print(f"DEBUG - scroll step {i + 1}")
 
-        cards = page.locator("div[class*='product'], article, a[href*='/kapida/']").all()
+        body_text = page.locator("body").inner_text()
+        print(f"DEBUG - BODY TEXT SAMPLE: {body_text[:2000]}")
 
-        print(f"DEBUG - CATEGORY URL: {url}")
-        print(f"DEBUG - TOTAL CARDS FOUND: {len(cards)}")
+        selectors = [
+            "div[class*='product']",
+            "article",
+            "a[href*='/kapida/']",
+            "div[class*='grid'] > div",
+        ]
+
+        best_cards = []
+        best_selector = None
+
+        for selector in selectors:
+            try:
+                current_cards = page.locator(selector).all()
+                print(f"DEBUG - SELECTOR {selector} -> {len(current_cards)} cards")
+
+                if len(current_cards) > len(best_cards):
+                    best_cards = current_cards
+                    best_selector = selector
+            except Exception as e:
+                print(f"DEBUG - SELECTOR ERROR {selector}: {e}")
+
+        print(f"DEBUG - BEST SELECTOR: {best_selector}")
+        print(f"DEBUG - TOTAL CARDS FOUND: {len(best_cards)}")
 
         seen_names = set()
 
-        for i, card in enumerate(cards):
+        for i, card in enumerate(best_cards):
             try:
                 text_blob = card.inner_text().strip()
 
-                if i < 15:
-                    print(f"DEBUG - RAW CARD {i}: {text_blob[:300]}")
+                if i < 20:
+                    print(f"DEBUG - RAW CARD {i}: {text_blob[:400]}")
 
                 if not text_blob:
                     continue
@@ -158,15 +189,17 @@ def get_a101_products(category_slug: str):
                 price = parse_price_from_lines(lines)
                 name = clean_product_name(lines)
 
-                if i < 15:
-                    print(f"DEBUG - PARSED CARD {i}: name={name}, price={price}, lines={lines[:8]}")
+                if i < 20:
+                    print(f"DEBUG - PARSED CARD {i}: name={name}, price={price}, lines={lines[:10]}")
 
-                # Bu aşamada filtreleri gevşek tutuyoruz
                 if price is None and name is None:
                     continue
 
                 if not name:
-                    name = f"unknown_a101_product_{i}"
+                    continue
+
+                if price is None:
+                    continue
 
                 normalized_name = name.lower().strip()
                 if normalized_name in seen_names:
@@ -181,8 +214,8 @@ def get_a101_products(category_slug: str):
                         "product_id": f"a101_{category_slug}_{i}",
                         "product_name": name,
                         "sku": f"a101_{category_slug}_{i}",
-                        "shown_price_tl": price if price is not None else 0,
-                        "regular_price_tl": price if price is not None else 0,
+                        "shown_price_tl": price,
+                        "regular_price_tl": price,
                         "discount_rate": None,
                         "product_url": url,
                         "brand_name": None,
