@@ -9,6 +9,7 @@ def refresh_materialized_views(cursor):
     ]
 
     for view_name in views:
+        # check existence
         cursor.execute(
             """
             SELECT 1
@@ -20,5 +21,11 @@ def refresh_materialized_views(cursor):
         )
         exists = cursor.fetchone()
 
-        if exists:
+        if not exists:
+            continue
+
+        try:
             cursor.execute(f"REFRESH MATERIALIZED VIEW {view_name}")
+        except Exception as e:
+            # do NOT crash pipeline
+            print(f"[WARN] Failed to refresh {view_name}: {e}")
