@@ -15,5 +15,5 @@ RETAILER_CONFIG = {
           "categories": {
             "fruit_veg": "meyve-sebze",
         },
-    }
+    },
 }
