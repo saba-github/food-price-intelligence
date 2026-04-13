@@ -106,7 +106,7 @@ def get_a101_products(category_slug: str):
     products = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
+        browser = p.chromium.launch(headless=False)
         page = browser.new_page()
         page.goto(url, timeout=60000, wait_until="domcontentloaded")
 
@@ -136,11 +136,18 @@ def get_a101_products(category_slug: str):
 
         cards = page.locator("div[class*='product'], article, a[href*='/kapida/']").all()
 
+        print(f"DEBUG - CATEGORY URL: {url}")
+        print(f"DEBUG - TOTAL CARDS FOUND: {len(cards)}")
+
         seen_names = set()
 
         for i, card in enumerate(cards):
             try:
                 text_blob = card.inner_text().strip()
+
+                if i < 15:
+                    print(f"DEBUG - RAW CARD {i}: {text_blob[:300]}")
+
                 if not text_blob:
                     continue
 
@@ -149,12 +156,17 @@ def get_a101_products(category_slug: str):
                     continue
 
                 price = parse_price_from_lines(lines)
-                if price is None:
+                name = clean_product_name(lines)
+
+                if i < 15:
+                    print(f"DEBUG - PARSED CARD {i}: name={name}, price={price}, lines={lines[:8]}")
+
+                # Bu aşamada filtreleri gevşek tutuyoruz
+                if price is None and name is None:
                     continue
 
-                name = clean_product_name(lines)
                 if not name:
-                    continue
+                    name = f"unknown_a101_product_{i}"
 
                 normalized_name = name.lower().strip()
                 if normalized_name in seen_names:
@@ -169,8 +181,8 @@ def get_a101_products(category_slug: str):
                         "product_id": f"a101_{category_slug}_{i}",
                         "product_name": name,
                         "sku": f"a101_{category_slug}_{i}",
-                        "shown_price_tl": price,
-                        "regular_price_tl": price,
+                        "shown_price_tl": price if price is not None else 0,
+                        "regular_price_tl": price if price is not None else 0,
                         "discount_rate": None,
                         "product_url": url,
                         "brand_name": None,
@@ -180,8 +192,11 @@ def get_a101_products(category_slug: str):
                     }
                 )
 
-            except Exception:
+            except Exception as e:
+                print(f"DEBUG - CARD ERROR {i}: {e}")
                 continue
+
+        print(f"DEBUG - TOTAL PRODUCTS RETURNED: {len(products)}")
 
         browser.close()
 
