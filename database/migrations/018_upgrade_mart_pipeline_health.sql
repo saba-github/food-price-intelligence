@@ -1,3 +1,4 @@
+DROP MATERIALIZED VIEW IF EXISTS mart_latest_prices;
 DROP MATERIALIZED VIEW IF EXISTS mart_pipeline_health;
 
 CREATE MATERIALIZED VIEW mart_pipeline_health AS

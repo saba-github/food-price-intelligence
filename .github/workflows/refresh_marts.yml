@@ -1,0 +1,53 @@
+name: Refresh marts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */3 * * *"   # her 3 saatte bir
+
+jobs:
+  refresh-marts:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install psycopg2-binary
+
+      - name: Refresh materialized views
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+        run: |
+          python - <<EOF
+          import psycopg2
+
+          conn = psycopg2.connect("${DATABASE_URL}")
+          cur = conn.cursor()
+
+          views = [
+              "mart_daily_prices",
+              "mart_top_movers",
+              "mart_price_anomalies",
+              "mart_pipeline_health",
+              "mart_latest_prices",
+              "mart_daily_prices_by_retailer",
+          ]
+
+          for v in views:
+              try:
+                  cur.execute(f"REFRESH MATERIALIZED VIEW {v}")
+                  print(f"Refreshed {v}")
+              except Exception as e:
+                  print(f"Skipped {v}: {e}")
+
+          conn.commit()
+          cur.close()
+          conn.close()
+          EOF

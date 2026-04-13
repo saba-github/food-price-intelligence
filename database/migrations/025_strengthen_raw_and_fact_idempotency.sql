@@ -66,18 +66,10 @@ WHERE r.event_id = rc.event_id
   AND rc.event_id <> rc.canonical_event_id;
 
 -- 5) raw unique constraint (ON CONFLICT için gerekli)
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM pg_constraint
-        WHERE conname = 'uniq_raw_event_hash_constraint'
-    ) THEN
-        ALTER TABLE raw_price_events
-        ADD CONSTRAINT uniq_raw_event_hash_constraint
-        UNIQUE (source_name, raw_hash);
-    END IF;
-END $$;
+-- NOTE:
+-- Raw uniqueness is enforced at run level in:
+-- 026_align_raw_idempotency_with_run_scope.sql
+-- Do NOT create global unique constraint here
 
 -- =========================
 -- FACT

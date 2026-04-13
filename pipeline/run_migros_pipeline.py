@@ -298,10 +298,7 @@ def run_pipeline(category_key: str = DEFAULT_CATEGORY_KEY):
                 records_failed=failed_count,
             )
 
-            # ---------------------------
-            # REFRESH MARTS
-            # ---------------------------
-            refresh_materialized_views(cur)
+           
 
             # ---------------------------
             # MART DATA QUALITY CHECKS

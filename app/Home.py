@@ -1,5 +1,6 @@
 import streamlit as st
 
+st.set_page_config(page_title="Food Price Intelligence", layout="wide")
 
-st.set_page_config(page_title="Shopping Optimizer", layout="wide")
-st.switch_page("pages/6_Shopping_Optimizer.py")
+st.title("Food Price Intelligence")
+st.caption("Choose a page from the sidebar.")

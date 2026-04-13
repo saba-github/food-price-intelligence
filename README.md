@@ -1,62 +1,35 @@
-#  Food Price Intelligence
+# Food Price Intelligence
 
-A production-style data system that collects, processes, validates, and analyzes food price data to generate reliable insights.
+A production-style data pipeline that collects, processes, and analyzes grocery price data.
 
----
+## What it does
 
-##  Dashboard
-
-<!-- buraya kendi streamlit screenshot'ını koy -->
-![Dashboard](./assets/dashboard.png)
-
----
-
-##  What it does
-
-- Scrapes real-time product prices (Migros)
-- Transforms raw data into structured datasets
+- Scrapes real product prices (Migros)
+- Stores raw data in PostgreSQL (Neon)
+- Transforms into structured datasets (raw → staging → fact)
 - Applies data quality checks & anomaly detection
-- Stores data in a cloud PostgreSQL database
-- Serves analytics via a Streamlit dashboard
+- Serves insights via a Streamlit dashboard
 
----
+## Architecture
 
-##  Architecture
+Source → Raw → Staging → Fact → Mart → Dashboard
 
-Source → Raw → Staging → Fact → Mart → Dashboard  
+## Tech Stack
 
-- **Raw**: unprocessed data  
-- **Staging**: normalization + quality checks  
-- **Fact**: trusted dataset  
-- **Mart**: aggregated analytics  
-
----
-
-##  Tech Stack
-
-- Python (data pipeline)
+- Python (ETL)
 - PostgreSQL (Neon)
-- SQL (transformations)
-- GitHub Actions (automation)
-- Streamlit (dashboard)
+- GitHub Actions (CI/CD)
+- Streamlit
 
----
+## Key Features
 
-##  Why this project
+- Idempotent data ingestion
+- Data quality validation
+- Automated pipelines
+- Analytical marts
+- Price trend tracking
 
-- Demonstrates end-to-end data engineering
-- Focuses on data quality & reliability
-- Built with a production mindset
+## Why this project
 
----
-
-##  Author
-
-**Sabahat Sengezer**  
-Data Analyst → Data Scientist  
-
----
-
-## Note
-
-This is not just a scraper — it's a **data product**.
+Built to simulate real-world data engineering systems  
+with a focus on reliability and data quality.
