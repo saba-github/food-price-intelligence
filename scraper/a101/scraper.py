@@ -27,85 +27,6 @@ def extract_unit_info(product_name: str):
     return None, None
 
 
-def is_valid_product_name(name: str) -> bool:
-    if not name:
-        return False
-
-    invalid_fragments = [
-        "Popüler Ürünler",
-        "Çerez Kullanımı",
-        "Kampanyalar",
-        "Giriş Yap",
-        "Sepetim",
-        "Aramak istediğin ürünü yaz",
-        "Böyle bir sayfa bulamadık",
-        "A101 Hep Ucuz",
-        "Kapıda",
-        "Teslimat",
-        "Seçtiğin mağaza",
-        "Kategoriler",
-        "Ana Sayfa",
-        "Site Haritası",
-        "İletişim",
-        "Yardım",
-    ]
-
-    lowered = name.lower().strip()
-
-    if len(lowered) < 3:
-        return False
-
-    for fragment in invalid_fragments:
-        if fragment.lower() in lowered:
-            return False
-
-    if "₺" in lowered:
-        return False
-
-    return True
-
-
-def parse_price_from_lines(lines):
-    price_pattern = re.compile(r"₺\s*([\d\.]+(?:,\d{1,2})?)")
-
-    prices = []
-    for line in lines:
-        matches = price_pattern.findall(line)
-        for match in matches:
-            raw_price = match.replace(".", "").replace(",", ".").strip()
-            try:
-                prices.append(float(raw_price))
-            except ValueError:
-                continue
-
-    if not prices:
-        return None
-
-    return min(prices)
-
-
-def clean_product_name(lines):
-    candidates = []
-
-    for line in lines:
-        line = line.strip()
-
-        if not is_valid_product_name(line):
-            continue
-
-        if re.search(r"\d+\s*(?:kg|g|gr|l|lt|ml|adet|li)\b", line, flags=re.IGNORECASE):
-            candidates.append(line)
-            continue
-
-        if not re.search(r"^\d+[.,]?\d*$", line) and "₺" not in line:
-            candidates.append(line)
-
-    if not candidates:
-        return None
-
-    return max(candidates, key=len).strip()
-
-
 def get_a101_products(category_slug: str):
     url = f"https://www.a101.com.tr/kapida/{category_slug}/"
     products = []
@@ -173,35 +94,55 @@ def get_a101_products(category_slug: str):
         body_text = page.locator("body").inner_text()
         print(f"DEBUG - BODY TEXT SAMPLE: {body_text[:2000]}")
 
-        cards = page.locator("div[class*='product']").all()
+        cards = page.locator("div[data-testid='product-card']").all()
 
-        print("DEBUG - FIXED SELECTOR: div[class*='product']")
+        print("DEBUG - USING SELECTOR: div[data-testid='product-card']")
         print(f"DEBUG - TOTAL CARDS FOUND: {len(cards)}")
 
         seen_names = set()
 
         for i, card in enumerate(cards):
             try:
-                text_blob = card.inner_text().strip()
+                name = card.locator("h3").inner_text().strip()
 
-                if i < 20:
-                    print(f"DEBUG - RAW CARD {i}: {text_blob[:400]}")
-
-                if not text_blob:
+                # Meyve-sebze dışı ürünleri ele
+                if any(
+                    x in name.lower()
+                    for x in [
+                        "süt",
+                        "peynir",
+                        "çikolata",
+                        "deterjan",
+                        "pirinç",
+                        "yumurta",
+                    ]
+                ):
                     continue
 
-                lines = [x.strip() for x in text_blob.splitlines() if x.strip()]
-                if not lines:
-                    continue
+                price = None
+                candidate_texts = []
 
-                price = parse_price_from_lines(lines)
-                name = clean_product_name(lines)
+                try:
+                    spans = card.locator("span").all_inner_texts()
+                    candidate_texts.extend(spans)
+                except Exception:
+                    pass
 
-                if i < 20:
-                    print(f"DEBUG - PARSED CARD {i}: name={name}, price={price}, lines={lines[:10]}")
+                try:
+                    card_text = card.inner_text()
+                    candidate_texts.append(card_text)
+                except Exception:
+                    pass
 
-                if not name:
-                    continue
+                for text in candidate_texts:
+                    matches = re.findall(r"₺\s*([\d\.]+(?:,\d{1,2})?)", text)
+                    if matches:
+                        raw_price = matches[0].replace(".", "").replace(",", ".").strip()
+                        try:
+                            price = float(raw_price)
+                            break
+                        except ValueError:
+                            continue
 
                 if price is None:
                     continue
@@ -209,7 +150,6 @@ def get_a101_products(category_slug: str):
                 normalized_name = name.lower().strip()
                 if normalized_name in seen_names:
                     continue
-
                 seen_names.add(normalized_name)
 
                 extracted_unit, extracted_amount = extract_unit_info(name)
