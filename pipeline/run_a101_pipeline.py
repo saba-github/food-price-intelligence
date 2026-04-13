@@ -34,6 +34,9 @@ def run_pipeline(category_key: str):
     else:
         category_slugs = [base_category_slug]
 
+    logger.info("DEBUG - base_category_slug=%s", base_category_slug)
+    logger.info("DEBUG - category_slugs=%s", category_slugs)
+
     conn = None
     run_id = None
 
@@ -45,14 +48,21 @@ def run_pipeline(category_key: str):
         seen_product_names = set()
 
         for slug in category_slugs:
-            logger.info("Scraping A101 subcategory: %s", slug)
+            logger.info("DEBUG - Scraping A101 subcategory: %s", slug)
             subcategory_products = get_a101_category_products(slug)
 
             logger.info(
-                "A101 subcategory %s returned %d products",
+                "DEBUG - A101 subcategory %s returned %d products",
                 slug,
                 len(subcategory_products),
             )
+
+            if subcategory_products:
+                logger.info(
+                    "DEBUG - First 3 products from %s: %s",
+                    slug,
+                    [p.get("product_name") for p in subcategory_products[:3]],
+                )
 
             for product in subcategory_products:
                 product_name = (product.get("product_name") or "").strip().lower()
