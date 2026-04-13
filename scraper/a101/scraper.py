@@ -43,6 +43,11 @@ def is_valid_product_name(name: str) -> bool:
         "Kapıda",
         "Teslimat",
         "Seçtiğin mağaza",
+        "Kategoriler",
+        "Ana Sayfa",
+        "Site Haritası",
+        "İletişim",
+        "Yardım",
     ]
 
     lowered = name.lower().strip()
@@ -168,33 +173,14 @@ def get_a101_products(category_slug: str):
         body_text = page.locator("body").inner_text()
         print(f"DEBUG - BODY TEXT SAMPLE: {body_text[:2000]}")
 
-        selectors = [
-            "div[class*='product']",
-            "article",
-            "a[href*='/kapida/']",
-            "div[class*='grid'] > div",
-        ]
+        cards = page.locator("div[class*='product']").all()
 
-        best_cards = []
-        best_selector = None
-
-        for selector in selectors:
-            try:
-                current_cards = page.locator(selector).all()
-                print(f"DEBUG - SELECTOR {selector} -> {len(current_cards)} cards")
-
-                if len(current_cards) > len(best_cards):
-                    best_cards = current_cards
-                    best_selector = selector
-            except Exception as e:
-                print(f"DEBUG - SELECTOR ERROR {selector}: {e}")
-
-        print(f"DEBUG - BEST SELECTOR: {best_selector}")
-        print(f"DEBUG - TOTAL CARDS FOUND: {len(best_cards)}")
+        print("DEBUG - FIXED SELECTOR: div[class*='product']")
+        print(f"DEBUG - TOTAL CARDS FOUND: {len(cards)}")
 
         seen_names = set()
 
-        for i, card in enumerate(best_cards):
+        for i, card in enumerate(cards):
             try:
                 text_blob = card.inner_text().strip()
 
@@ -213,9 +199,6 @@ def get_a101_products(category_slug: str):
 
                 if i < 20:
                     print(f"DEBUG - PARSED CARD {i}: name={name}, price={price}, lines={lines[:10]}")
-
-                if price is None and name is None:
-                    continue
 
                 if not name:
                     continue
