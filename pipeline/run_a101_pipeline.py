@@ -35,6 +35,17 @@ def run_pipeline(category_key: str):
         products = get_a101_category_products(category_slug)
         logger.info("A101 scraped %d products", len(products))
 
+        if products:
+            logger.info("A101 first 5 products preview:")
+            for product in products[:5]:
+                logger.info(
+                    "product_name=%r shown_price_tl=%r unit=%r unit_amount=%r",
+                    product.get("product_name"),
+                    product.get("shown_price_tl"),
+                    product.get("unit"),
+                    product.get("unit_amount"),
+                )
+
         # -------------------------
         # 2) DB CONNECT
         # -------------------------
@@ -51,6 +62,20 @@ def run_pipeline(category_key: str):
             )
             conn.commit()
 
+        # Eğer 0 ürün geldiyse başarılı sayma
+        if not products:
+            with conn.cursor() as cur:
+                fail_run(
+                    cur,
+                    run_id,
+                    f"A101 scraper returned 0 products for category_key={category_key} category_slug={category_slug}",
+                )
+                conn.commit()
+
+            raise RuntimeError(
+                f"A101 scraper returned 0 products for category_key={category_key} category_slug={category_slug}"
+            )
+
         raw_count = 0
         stg_count = 0
         fact_count = 0
@@ -62,7 +87,6 @@ def run_pipeline(category_key: str):
         for product in products:
             try:
                 with conn.cursor() as cur:
-                    # RAW
                     event_id = insert_raw_event(
                         cur,
                         run_id=run_id,
@@ -72,7 +96,6 @@ def run_pipeline(category_key: str):
                         currency=currency,
                     )
 
-                    # STG SOURCE
                     insert_stg_source_product(
                         cur,
                         event_id=event_id,
@@ -81,17 +104,14 @@ def run_pipeline(category_key: str):
                         source_name=source_name,
                     )
 
-                    # TRANSFORM
                     transformed = transform_product(product)
 
-                    # DIM
                     product_id = get_or_create_product_id(
                         cur,
                         transformed["standardized_product_name"],
                         transformed.get("category_name"),
                     )
 
-                    # STG NORMALIZED
                     insert_stg_normalized_observation(
                         cur,
                         event_id,
@@ -101,7 +121,6 @@ def run_pipeline(category_key: str):
                         source_name=source_name,
                     )
 
-                    # STG OBS
                     observation_id = insert_stg_observation(
                         cur,
                         event_id,
@@ -112,7 +131,6 @@ def run_pipeline(category_key: str):
                         currency=currency,
                     )
 
-                    # FACT
                     inserted = insert_fact_observation(
                         cur,
                         observation_id,
@@ -167,7 +185,7 @@ def run_pipeline(category_key: str):
         if conn:
             try:
                 conn.rollback()
-            except:
+            except Exception:
                 pass
 
         if conn and run_id:
@@ -175,7 +193,7 @@ def run_pipeline(category_key: str):
                 with conn.cursor() as cur:
                     fail_run(cur, run_id, str(e))
                     conn.commit()
-            except:
+            except Exception:
                 pass
 
         logger.exception("A101 pipeline failed: %s", e)
