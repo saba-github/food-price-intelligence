@@ -3,13 +3,8 @@ from typing import Any, Optional, Tuple
 
 
 def normalize_unit(
-    unit: Optional[str], quantity: Any
+    unit: Optional[str], quantity: Any, product_name: Optional[str] = None
 ) -> Tuple[Optional[str], Optional[float]]:
-    if unit is None:
-        return None, None
-
-    unit_upper = str(unit).strip().upper()
-
     qty: Optional[float] = None
     if quantity is not None:
         try:
@@ -17,15 +12,63 @@ def normalize_unit(
         except (TypeError, ValueError):
             qty = None
 
-    if unit_upper == "GRAM":
-        if qty is None:
-            return "kg", None
-        return "kg", round(qty / 1000, 4)
+    # 1) Unit varsa önce onu kullan
+    if unit is not None:
+        unit_upper = str(unit).strip().upper()
 
-    if unit_upper == "PIECE":
-        return "piece", qty if qty is not None else 1.0
+        if unit_upper == "GRAM":
+            if qty is None:
+                return "kg", None
+            return "kg", round(qty / 1000, 4)
 
-    return unit.lower(), qty
+        if unit_upper == "KG":
+            return "kg", qty if qty is not None else 1.0
+
+        if unit_upper == "PIECE":
+            return "piece", qty if qty is not None else 1.0
+
+        if unit_upper == "LITER":
+            return "liter", qty if qty is not None else 1.0
+
+        if unit_upper == "ML":
+            if qty is None:
+                return "liter", None
+            return "liter", round(qty / 1000, 4)
+
+        return unit.lower(), qty
+
+    # 2) Unit yoksa product_name'den çözmeye çalış
+    name = (product_name or "").lower().strip()
+
+    if not name:
+        return None, None
+
+    tr_map = {"ı": "i", "ğ": "g", "ü": "u", "ş": "s", "ö": "o", "ç": "c"}
+    for old, new in tr_map.items():
+        name = name.replace(old, new)
+
+    if re.search(r"\bkg\b", name):
+        return "kg", 1.0
+
+    gram_match = re.search(r"(\d+(?:[.,]\d+)?)\s*g\b", name)
+    if gram_match:
+        grams = float(gram_match.group(1).replace(",", "."))
+        return "kg", round(grams / 1000, 4)
+
+    liter_match = re.search(r"(\d+(?:[.,]\d+)?)\s*l\b", name)
+    if liter_match:
+        liters = float(liter_match.group(1).replace(",", "."))
+        return "liter", liters
+
+    ml_match = re.search(r"(\d+(?:[.,]\d+)?)\s*ml\b", name)
+    if ml_match:
+        ml = float(ml_match.group(1).replace(",", "."))
+        return "liter", round(ml / 1000, 4)
+
+    if re.search(r"\badet\b", name):
+        return "piece", 1.0
+
+    return None, None
 
 
 def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
@@ -106,7 +149,11 @@ def transform_product(product: dict[str, Any]) -> dict[str, Any]:
     unit = product.get("unit")
     unit_amount = product.get("unit_amount")
 
-    normalized_unit, normalized_quantity = normalize_unit(unit, unit_amount)
+    normalized_unit, normalized_quantity = normalize_unit(
+        unit,
+        unit_amount,
+        product.get("product_name"),
+    )
     price_per_unit = calculate_price_per_unit(price, normalized_quantity)
     unit_price_label = build_unit_price_label(normalized_unit)
     standardized_product_name = standardize_product_name(product.get("product_name"))
