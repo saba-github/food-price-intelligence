@@ -106,15 +106,38 @@ def get_a101_products(category_slug: str):
     products = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page(viewport={"width": 1440, "height": 2200})
+        browser = p.chromium.launch(
+            headless=True,
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+            ],
+        )
+
+        context = browser.new_context(
+            viewport={"width": 1440, "height": 2200},
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/123.0.0.0 Safari/537.36"
+            ),
+            locale="tr-TR",
+        )
+
+        page = context.new_page()
+
+        page.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+        """)
 
         print(f"DEBUG - CATEGORY URL: {url}")
 
         page.goto(url, timeout=60000, wait_until="domcontentloaded")
         page.wait_for_timeout(5000)
 
-        # Location popup
         for text in [
             "Bu defalık izin ver",
             "Siteyi ziyaret ederken izin ver",
@@ -127,7 +150,6 @@ def get_a101_products(category_slug: str):
             except Exception:
                 pass
 
-        # Cookie popup
         for text in ["KABUL ET", "Kabul Et", "Tümünü Kabul Et"]:
             try:
                 page.get_by_text(text, exact=True).click(timeout=3000)
@@ -231,6 +253,7 @@ def get_a101_products(category_slug: str):
 
         print(f"DEBUG - TOTAL PRODUCTS RETURNED: {len(products)}")
 
+        context.close()
         browser.close()
 
     return products
