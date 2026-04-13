@@ -13,7 +13,7 @@ RETAILER_CONFIG = {
         "source_name": "a101",
         "currency": "TRY",
           "categories": {
-            "fruit_veg": "meyve-ve-sebze",
+            "fruit_veg": "meyve-sebze",
         },
-    }
+    },
 }
