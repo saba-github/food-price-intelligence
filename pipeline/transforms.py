@@ -34,16 +34,25 @@ def standardize_product_name(product_name: Optional[str]) -> Optional[str]:
 
     name = product_name.lower().strip()
 
+    # Türkçe karakter normalize
     tr_map = {"ı": "i", "ğ": "g", "ü": "u", "ş": "s", "ö": "o", "ç": "c"}
     for old, new in tr_map.items():
         name = name.replace(old, new)
 
-    name = re.sub(r"\b\d+\s*(?:kg|g|gram|ml|l|lt|adet|demet|paket)\b", " ", name)
+    # miktarları sil (500 g, 1 kg vs)
+    name = re.sub(r"\b\d+(?:[.,]\d+)?\s*(kg|g|gram|ml|l|lt|adet|demet|paket)\b", " ", name)
 
-    standalone_units = r"\b(?:kg|gram|adet|demet|paket)\b"
-    name = re.sub(standalone_units, " ", name)
+    # standalone unit temizliği
+    name = re.sub(r"\b(kg|gram|adet|demet|paket)\b", " ", name)
 
+    # fazla boşluk temizle
     name = re.sub(r"\s+", " ", name).strip()
+
+    # 🔥🔥🔥 CRITICAL FIX (ASLA SİLME)
+    # kelimeleri sırala → canonical matching için
+    words = name.split()
+    words.sort()
+    name = " ".join(words)
 
     return name or None
 
@@ -109,6 +118,8 @@ def transform_product(product: dict[str, Any]) -> dict[str, Any]:
     normalized_unit, normalized_quantity = normalize_unit(unit, unit_amount)
     price_per_unit = calculate_price_per_unit(price, normalized_quantity)
     unit_price_label = build_unit_price_label(normalized_unit)
+
+    # 🔥 burada yeni standardization çalışıyor
     standardized_product_name = standardize_product_name(product.get("product_name"))
 
     is_suspicious, suspicious_reason = detect_suspicious(
