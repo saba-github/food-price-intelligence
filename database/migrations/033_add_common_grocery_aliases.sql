@@ -1,3 +1,4 @@
+
 INSERT INTO dim_product_aliases (
     product_id,
     alias_text,
