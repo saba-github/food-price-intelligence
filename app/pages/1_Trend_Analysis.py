@@ -9,6 +9,7 @@ from queries import (
     TOP_EXPENSIVE_QUERY,
     TOP_CHEAPEST_QUERY,
     PRICE_TREND_QUERY,
+    GLOBAL_FRESHNESS_QUERY,
 )
 
 st.set_page_config(page_title="Trend Analysis", layout="wide")
@@ -283,6 +284,15 @@ available_categories = categories_df["category_name"].dropna().tolist() if not c
 selected_date = available_dates[0] if available_dates else None
 selected_category = "All"
 
+freshness_df = run_query(GLOBAL_FRESHNESS_QUERY)
+freshness_text = None
+if not freshness_df.empty:
+    freshness_row = freshness_df.iloc[0]
+    freshness_text = (
+        f"Data freshness: {freshness_row.get('latest_data_date')} | "
+        f"Last successful run: {freshness_row.get('latest_success_started_at')}"
+    )
+
 # --------------------------------------------------
 # Header shell
 # --------------------------------------------------
@@ -300,6 +310,9 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+if freshness_text:
+    st.caption(freshness_text)
 
 nav1, nav2, nav3, nav4, nav5 = st.columns(5)
 

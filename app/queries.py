@@ -4,6 +4,23 @@ from mart_daily_prices
 order by date desc
 """
 
+GLOBAL_FRESHNESS_QUERY = """
+with latest_data as (
+    select max(date) as latest_data_date
+    from mart_daily_prices
+),
+latest_success_run as (
+    select max(started_at) as latest_success_started_at
+    from scrape_runs
+    where status = 'success'
+)
+select
+    ld.latest_data_date,
+    lsr.latest_success_started_at
+from latest_data ld
+cross join latest_success_run lsr
+"""
+
 CATEGORY_LIST_QUERY = """
 select distinct category_name
 from mart_daily_prices

@@ -3,7 +3,7 @@ import plotly.express as px
 import pandas as pd
 
 from db import run_query
-from queries import TOP_VOLATILE_QUERY
+from queries import TOP_VOLATILE_QUERY, GLOBAL_FRESHNESS_QUERY
 
 st.set_page_config(page_title="Anomalies", layout="wide")
 
@@ -166,6 +166,14 @@ def build_dark_figure(fig, height=420):
 # Data
 # --------------------------------------------------
 df = get_anomalies_data()
+freshness_df = run_query(GLOBAL_FRESHNESS_QUERY)
+freshness_text = None
+if not freshness_df.empty:
+    freshness_row = freshness_df.iloc[0]
+    freshness_text = (
+        f"Data freshness: {freshness_row.get('latest_data_date')} | "
+        f"Last successful run: {freshness_row.get('latest_success_started_at')}"
+    )
 
 if df.empty:
     st.markdown("""
@@ -194,6 +202,9 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+if freshness_text:
+    st.caption(freshness_text)
 
 # --------------------------------------------------
 # Filter

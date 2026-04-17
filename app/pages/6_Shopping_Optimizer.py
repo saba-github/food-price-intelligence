@@ -11,12 +11,22 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
 from pipeline.optimizer.engine import optimize_basket
+from db import run_query
+from queries import GLOBAL_FRESHNESS_QUERY
 
 
 st.set_page_config(page_title="Shopping Optimizer", layout="wide")
 
 st.title("Shopping Optimizer")
 st.caption("Enter a shopping list to compare split basket pricing against single market options.")
+
+freshness_df = run_query(GLOBAL_FRESHNESS_QUERY)
+if not freshness_df.empty:
+    freshness_row = freshness_df.iloc[0]
+    st.caption(
+        f"Data freshness: {freshness_row.get('latest_data_date')} | "
+        f"Last successful run: {freshness_row.get('latest_success_started_at')}"
+    )
 
 user_text = st.text_area(
     "Shopping List",
