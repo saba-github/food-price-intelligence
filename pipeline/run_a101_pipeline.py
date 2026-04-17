@@ -1,3 +1,4 @@
+import os
 import logging
 from typing import Any
 
@@ -20,6 +21,13 @@ logger = logging.getLogger(__name__)
 
 source_name = RETAILER_CONFIG["a101"]["source_name"]
 currency = RETAILER_CONFIG["a101"]["currency"]
+PIPELINE_VERSION = "v2-a101-001"
+
+
+def resolve_triggered_by() -> str:
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        return "github_actions"
+    return "manual"
 
 
 def run_pipeline(category_key: str):
@@ -46,8 +54,8 @@ def run_pipeline(category_key: str):
                 source_name=source_name,
                 category_key=category_key,
                 category_slug=category_slug,
-                triggered_by="local_test",
-                pipeline_version="v2-a101",
+                triggered_by=resolve_triggered_by(),
+                pipeline_version=PIPELINE_VERSION,
             )
             conn.commit()
 

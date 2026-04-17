@@ -6,9 +6,14 @@ on:
       - dev
   workflow_dispatch:
 
+concurrency:
+  group: load-to-neon-dev
+  cancel-in-progress: false
+
 jobs:
   migrate-dev:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repo
@@ -24,24 +29,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
       - name: Run database migrations (DEV)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           set -euo pipefail
           echo "Running migrations on DEV..."
-
-          for file in $(ls database/migrations/*.sql | sort); do
-            echo "Running $file"
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
-          done
+          python scripts/run_migrations.py
 
   run-etl:
     needs: migrate-dev
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     strategy:
       fail-fast: false
@@ -66,4 +66,5 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
           PYTHONPATH: ${{ github.workspace }}
+          PYTHONUNBUFFERED: "1"
         run: python pipeline/run_pipeline.py --retailer migros --category ${{ matrix.category }}

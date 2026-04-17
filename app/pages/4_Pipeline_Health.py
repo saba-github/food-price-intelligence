@@ -3,7 +3,7 @@ import plotly.express as px
 import pandas as pd
 
 from db import run_query
-from queries import PIPELINE_HEALTH_QUERY, QUALITY_RESULTS_QUERY
+from queries import PIPELINE_HEALTH_QUERY, QUALITY_RESULTS_QUERY, GLOBAL_FRESHNESS_QUERY
 
 st.set_page_config(page_title="Pipeline Health", layout="wide")
 
@@ -208,6 +208,15 @@ def fmt_num(x, digits=2):
     return f"{float(x):,.{digits}f}"
 
 
+def format_snapshot_date(value) -> str:
+    if pd.isna(value):
+        return "No snapshot date"
+    try:
+        return pd.to_datetime(value).strftime("%b %d, %Y").replace(" 0", " ")
+    except Exception:
+        return str(value)
+
+
 def build_dark_figure(fig, height=420):
     fig.update_layout(
         height=height,
@@ -225,6 +234,14 @@ def build_dark_figure(fig, height=420):
 # Data
 # --------------------------------------------------
 health_df, quality_df = get_pipeline_data()
+freshness_df = run_query(GLOBAL_FRESHNESS_QUERY)
+freshness_text = None
+if not freshness_df.empty:
+    freshness_row = freshness_df.iloc[0]
+    freshness_text = (
+        f"Data freshness: {freshness_row.get('latest_data_date')} | "
+        f"Last successful run: {freshness_row.get('latest_success_started_at')}"
+    )
 
 if health_df.empty:
     st.markdown("""
@@ -268,7 +285,7 @@ latest_duration = latest.get("run_duration_seconds")
 latest_failed_check = latest.get("last_failed_check_name")
 latest_failed_details = latest.get("last_failed_check_details")
 
-latest_snapshot = "Apr 10, 2026"
+latest_snapshot = format_snapshot_date(latest.get("started_at"))
 
 # --------------------------------------------------
 # Hero
@@ -282,6 +299,9 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+if freshness_text:
+    st.caption(freshness_text)
 
 # --------------------------------------------------
 # KPI Cards

@@ -3,7 +3,7 @@ import plotly.express as px
 import pandas as pd
 
 from db import run_query
-from queries import TOP_MOVERS_QUERY, TOP_DECLINERS_QUERY
+from queries import TOP_MOVERS_QUERY, TOP_DECLINERS_QUERY, GLOBAL_FRESHNESS_QUERY
 
 st.set_page_config(page_title="Top Movers", layout="wide")
 
@@ -182,6 +182,15 @@ def fmt_pct(x, digits=1):
     return f"{sign}{float(x):.{digits}f}%"
 
 
+def format_snapshot_date(value) -> str:
+    if pd.isna(value):
+        return "No snapshot date"
+    try:
+        return pd.to_datetime(value).strftime("%b %d, %Y").replace(" 0", " ")
+    except Exception:
+        return str(value)
+
+
 def build_dark_figure(fig, height=420):
     fig.update_layout(
         height=height,
@@ -200,6 +209,14 @@ def build_dark_figure(fig, height=420):
 # Data
 # --------------------------------------------------
 movers_df, decliners_df = get_top_movers_data()
+freshness_df = run_query(GLOBAL_FRESHNESS_QUERY)
+freshness_text = None
+if not freshness_df.empty:
+    freshness_row = freshness_df.iloc[0]
+    freshness_text = (
+        f"Data freshness: {freshness_row.get('latest_data_date')} | "
+        f"Last successful run: {freshness_row.get('latest_success_started_at')}"
+    )
 
 if movers_df.empty and decliners_df.empty:
     st.markdown("""
@@ -230,7 +247,12 @@ largest_increase = top_gainer["pct_change"] if top_gainer is not None else None
 largest_drop = top_loser["pct_change"] if top_loser is not None else None
 
 total_movers = len(movers_df) + len(decliners_df)
-latest_snapshot = "Apr 10, 2026"
+latest_date_candidates = []
+for df in (movers_df, decliners_df):
+    if "date" in df.columns:
+        latest_date_candidates.extend(df["date"].dropna().tolist())
+
+latest_snapshot = format_snapshot_date(max(latest_date_candidates)) if latest_date_candidates else "No snapshot date"
 
 # --------------------------------------------------
 # Hero
@@ -244,6 +266,9 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
+if freshness_text:
+    st.caption(freshness_text)
 
 # --------------------------------------------------
 # KPI Cards

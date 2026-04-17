@@ -3,9 +3,14 @@ name: Load A101 to Neon (DEV)
 on:
   workflow_dispatch:
 
+concurrency:
+  group: load-a101-to-neon-dev
+  cancel-in-progress: false
+
 jobs:
   run-etl:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repo
@@ -25,23 +30,18 @@ jobs:
         run: |
           python -m playwright install --with-deps chromium
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
-
       - name: Run database migrations (DEV)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+          PYTHONPATH: ${{ github.workspace }}
         run: |
           set -euo pipefail
           echo "Running migrations on DEV..."
-
-          for file in $(ls database/migrations/*.sql | sort); do
-            echo "Running $file"
-            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file"
-          done
+          python scripts/run_migrations.py
 
       - name: Run A101 pipeline (DEV)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
           PYTHONPATH: ${{ github.workspace }}
+          PYTHONUNBUFFERED: "1"
         run: python -m pipeline.run_pipeline --retailer a101 --category fruit_veg

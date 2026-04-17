@@ -7,12 +7,21 @@ from queries import (
     CROSS_RETAILER_PRODUCTS_QUERY,
     CROSS_RETAILER_COMPARISON_QUERY,
     CHEAPEST_RETAILER_TODAY_QUERY,
+    GLOBAL_FRESHNESS_QUERY,
 )
 
 st.set_page_config(page_title="Cross Retailer Comparison", layout="wide")
 
 st.title("Cross Retailer Comparison")
 st.caption("Compare the same product across Migros and A101")
+
+freshness_df = run_query(GLOBAL_FRESHNESS_QUERY)
+if not freshness_df.empty:
+    freshness_row = freshness_df.iloc[0]
+    st.caption(
+        f"Data freshness: {freshness_row.get('latest_data_date')} | "
+        f"Last successful run: {freshness_row.get('latest_success_started_at')}"
+    )
 
 # --------------------------------------------------
 # Product selector
