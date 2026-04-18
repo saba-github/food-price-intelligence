@@ -1,29 +1,56 @@
 import logging
 import os
 import re
+from urllib.parse import urljoin
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from playwright.sync_api import sync_playwright
 
 logger = logging.getLogger(__name__)
 
 AUTOMATION_ENV_VARS = ("CI", "GITHUB_ACTIONS")
 HEADLESS_TRUTHY_VALUES = {"1", "true", "yes", "on"}
+TEXT_REPAIR_MARKERS = ("Ã", "Ä", "Å", "â", "Â")
+POPUP_TEXTS = (
+    "Bu defalık izin ver",
+    "Siteyi ziyaret ederken izin ver",
+    "Hiçbir zaman izin verme",
+)
+COOKIE_TEXTS = (
+    "Tümünü Kabul Et",
+    "Tümünü kabul et",
+    "KABUL ET",
+    "Kabul Et",
+)
+PRODUCT_CARD_SELECTORS = (
+    "a[href*='_p-']",
+    "article:has(a[href*='_p-'])",
+    "div[class*='product']",
+)
 
 
 def repair_text(text: str) -> str:
     if not text:
         return ""
 
-    if not any(marker in text for marker in ("Ã", "Å", "Ä", "â", "Â")):
-        return text
+    repaired = text
+    for _ in range(2):
+        if not any(marker in repaired for marker in TEXT_REPAIR_MARKERS):
+            break
 
-    for source_encoding in ("cp1252", "latin1"):
-        try:
-            return text.encode(source_encoding).decode("utf-8")
-        except (UnicodeEncodeError, UnicodeDecodeError):
-            continue
+        for source_encoding in ("cp1252", "latin1"):
+            try:
+                candidate = repaired.encode(source_encoding).decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
 
-    return text
+            if candidate != repaired:
+                repaired = candidate
+                break
+        else:
+            break
+
+    return repaired
 
 
 def normalize_text(text: str) -> str:
@@ -87,12 +114,17 @@ def is_valid_product_name(name: str) -> bool:
     return True
 
 
+def line_has_price_indicator(line: str) -> bool:
+    normalized_line = normalize_text(line)
+    upper_line = normalized_line.upper()
+    return "₺" in normalized_line or "TL" in upper_line or "TRY" in upper_line
+
+
 def parse_price_from_lines(lines):
     for line in lines:
         normalized_line = normalize_text(line)
-        upper_line = normalized_line.upper()
 
-        if "₺" not in normalized_line and "TL" not in upper_line and "TRY" not in upper_line:
+        if not line_has_price_indicator(normalized_line):
             continue
 
         price_candidates = re.findall(r"\d[\d.,]*", normalized_line)
@@ -107,43 +139,129 @@ def parse_price_from_lines(lines):
     return None
 
 
+def dismiss_optional_overlay(page, texts) -> bool:
+    for text in texts:
+        for locator in (
+            page.get_by_role("button", name=text, exact=False),
+            page.get_by_text(text, exact=False),
+        ):
+            try:
+                locator.first.click(timeout=2500)
+                page.wait_for_timeout(500)
+                return True
+            except Exception:
+                continue
+
+    return False
+
+
+def wait_for_catalog_page(page) -> None:
+    try:
+        page.wait_for_load_state("domcontentloaded", timeout=10000)
+    except PlaywrightTimeoutError:
+        pass
+
+    try:
+        page.wait_for_load_state("networkidle", timeout=10000)
+    except PlaywrightTimeoutError:
+        pass
+
+    page.wait_for_timeout(1500)
+
+
+def scroll_catalog(page, passes: int = 8) -> None:
+    last_height = 0
+
+    for _ in range(passes):
+        try:
+            page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+            page.wait_for_timeout(1000)
+            current_height = page.evaluate("document.body.scrollHeight")
+        except Exception:
+            page.wait_for_timeout(1000)
+            continue
+
+        if current_height == last_height:
+            page.wait_for_timeout(500)
+        last_height = current_height
+
+
+def get_product_cards(page):
+    for selector in PRODUCT_CARD_SELECTORS:
+        locator = page.locator(selector)
+
+        try:
+            count = locator.count()
+        except Exception:
+            continue
+
+        if count:
+            logger.info(
+                "Found A101 product cards selector=%s count=%s",
+                selector,
+                count,
+            )
+            return locator.all()
+
+    return []
+
+
+def prepare_catalog_page(page) -> None:
+    wait_for_catalog_page(page)
+    dismiss_optional_overlay(page, POPUP_TEXTS)
+    dismiss_optional_overlay(page, COOKIE_TEXTS)
+    wait_for_catalog_page(page)
+    scroll_catalog(page)
+    wait_for_catalog_page(page)
+
+
+def extract_product_url(card, fallback_url: str) -> str:
+    try:
+        href = card.get_attribute("href")
+    except Exception:
+        href = None
+
+    if not href:
+        try:
+            href = card.locator("a[href]").first.get_attribute("href")
+        except Exception:
+            href = None
+
+    if href:
+        return urljoin(fallback_url, href)
+
+    return fallback_url
+
+
 def get_a101_products(category_slug: str):
     url = f"https://www.a101.com.tr/kapida/{category_slug}/"
     products = []
 
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=should_run_headless())
-        page = browser.new_page()
-        page.goto(url, timeout=60000)
+        page = browser.new_page(viewport={"width": 1440, "height": 2200})
+        page.goto(url, wait_until="domcontentloaded", timeout=60000)
 
-        for text in [
-            "Bu defalık izin ver",
-            "Siteyi ziyaret ederken izin ver",
-            "Hiçbir zaman izin verme",
-        ]:
-            try:
-                page.get_by_text(text, exact=True).click(timeout=3000)
-                break
-            except Exception:
-                pass
-
-        for text in ["KABUL ET", "Kabul Et", "Tümünü Kabul Et"]:
-            try:
-                page.get_by_text(text, exact=True).click(timeout=3000)
-                break
-            except Exception:
-                pass
-
-        page.wait_for_timeout(4000)
-
-        for _ in range(8):
-            page.mouse.wheel(0, 2500)
-            page.wait_for_timeout(1200)
-
-        cards = page.locator("div[class*='product']").all()
+        prepare_catalog_page(page)
+        cards = get_product_cards(page)
 
         if not cards:
-            logger.warning("No A101 product cards found for category_slug=%s", category_slug)
+            logger.warning(
+                "Retrying A101 catalog load category_slug=%s url=%s",
+                category_slug,
+                page.url,
+            )
+            page.reload(wait_until="domcontentloaded", timeout=60000)
+            prepare_catalog_page(page)
+            cards = get_product_cards(page)
+
+        if not cards:
+            logger.warning(
+                "No A101 product cards found for category_slug=%s url=%s title=%s",
+                category_slug,
+                page.url,
+                page.title(),
+            )
 
         for i, card in enumerate(cards):
             try:
@@ -169,8 +287,7 @@ def get_a101_products(category_slug: str):
 
                 name = None
                 for line in lines:
-                    upper_line = line.upper()
-                    if "₺" not in line and "TL" not in upper_line and "TRY" not in upper_line and len(line) > 2:
+                    if not line_has_price_indicator(line) and len(line) > 2:
                         if is_valid_product_name(line):
                             name = line
                             break
@@ -192,7 +309,7 @@ def get_a101_products(category_slug: str):
                         "shown_price_tl": price,
                         "regular_price_tl": price,
                         "discount_rate": None,
-                        "product_url": url,
+                        "product_url": extract_product_url(card, url),
                         "brand_name": None,
                         "category_name": "Meyve ve Sebze",
                         "unit": extracted_unit,
