@@ -10,15 +10,15 @@ logger = logging.getLogger(__name__)
 
 AUTOMATION_ENV_VARS = ("CI", "GITHUB_ACTIONS")
 HEADLESS_TRUTHY_VALUES = {"1", "true", "yes", "on"}
-TEXT_REPAIR_MARKERS = ("Ã", "Ä", "Å", "â", "Â")
+TEXT_REPAIR_MARKERS = ("Ãƒ", "Ã„", "Ã…", "Ã¢", "Ã‚")
 POPUP_TEXTS = (
-    "Bu defalık izin ver",
+    "Bu defalÄ±k izin ver",
     "Siteyi ziyaret ederken izin ver",
-    "Hiçbir zaman izin verme",
+    "HiÃ§bir zaman izin verme",
 )
 COOKIE_TEXTS = (
-    "Tümünü Kabul Et",
-    "Tümünü kabul et",
+    "TÃ¼mÃ¼nÃ¼ Kabul Et",
+    "TÃ¼mÃ¼nÃ¼ kabul et",
     "KABUL ET",
     "Kabul Et",
 )
@@ -27,6 +27,9 @@ PRODUCT_CARD_SELECTORS = (
     "article:has(a[href*='_p-'])",
     "div[class*='product']",
 )
+DECIMAL_PRICE_PATTERN = re.compile(r"(?<!\d)(\d{1,4})[.,](\d{2})(?!\d)")
+WHOLE_PRICE_LINE_PATTERN = re.compile(r"^\d{1,4}$")
+FRACTION_PRICE_LINE_PATTERN = re.compile(r"^\d{2}$")
 
 
 def repair_text(text: str) -> str:
@@ -117,15 +120,36 @@ def is_valid_product_name(name: str) -> bool:
 def line_has_price_indicator(line: str) -> bool:
     normalized_line = normalize_text(line)
     upper_line = normalized_line.upper()
-    return "₺" in normalized_line or "TL" in upper_line or "TRY" in upper_line
+    return (
+        "₺" in normalized_line
+        or "â‚º" in normalized_line
+        or "TL" in upper_line
+        or "TRY" in upper_line
+    )
+
+
+def parse_decimal_price(text: str):
+    normalized_text = normalize_text(text)
+    match = DECIMAL_PRICE_PATTERN.search(normalized_text)
+    if not match:
+        return None
+
+    try:
+        return float(f"{match.group(1)}.{match.group(2)}")
+    except ValueError:
+        return None
 
 
 def parse_price_from_lines(lines):
-    for line in lines:
-        normalized_line = normalize_text(line)
+    normalized_lines = [normalize_text(line) for line in lines if normalize_text(line)]
 
+    for normalized_line in normalized_lines:
         if not line_has_price_indicator(normalized_line):
             continue
+
+        price = parse_decimal_price(normalized_line)
+        if price is not None:
+            return price
 
         price_candidates = re.findall(r"\d[\d.,]*", normalized_line)
 
@@ -133,6 +157,18 @@ def parse_price_from_lines(lines):
             raw_price = candidate.replace(".", "").replace(",", ".").strip()
             try:
                 return float(raw_price)
+            except ValueError:
+                continue
+
+    for normalized_line in normalized_lines:
+        price = parse_decimal_price(normalized_line)
+        if price is not None:
+            return price
+
+    for current_line, next_line in zip(normalized_lines, normalized_lines[1:]):
+        if WHOLE_PRICE_LINE_PATTERN.fullmatch(current_line) and FRACTION_PRICE_LINE_PATTERN.fullmatch(next_line):
+            try:
+                return float(f"{current_line}.{next_line}")
             except ValueError:
                 continue
 

@@ -27,6 +27,14 @@ def test_parse_price_from_mojibake_fixture():
     assert parse_price_from_lines(lines) == 79.95
 
 
+def test_parse_price_without_currency_indicator():
+    assert parse_price_from_lines(["Ithal Muz 1 kg", "79,95"]) == 79.95
+
+
+def test_parse_price_from_split_integer_and_fraction_lines():
+    assert parse_price_from_lines(["Ithal Muz 1 kg", "79", "95"]) == 79.95
+
+
 def test_extract_unit_info_from_utf8_fixture():
     product_name = load_fixture_lines("card_utf8.txt")[0]
     assert extract_unit_info(product_name) == ("KG", 1.0)
