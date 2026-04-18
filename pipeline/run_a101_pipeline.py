@@ -11,6 +11,7 @@ from pipeline.loaders_staging import (
     insert_stg_observation,
     insert_stg_source_product,
 )
+from pipeline.quality import log_quality_check
 from pipeline.run_lifecycle import start_run, finish_run, fail_run
 from pipeline.transforms import transform_product
 from scraper.a101.categories import get_a101_category_products
@@ -49,6 +50,31 @@ def run_pipeline(category_key: str):
                 triggered_by="local_test",
                 pipeline_version="v2-a101",
             )
+            conn.commit()
+
+        with conn.cursor() as cur:
+            scrape_not_empty_status = "pass" if products else "fail"
+            log_quality_check(
+                cur,
+                run_id,
+                "a101_scrape_not_empty",
+                scrape_not_empty_status,
+                len(products),
+                1,
+                "A101 scraper should return at least one product.",
+            )
+
+            if not products:
+                fail_run(
+                    cur,
+                    run_id,
+                    f"No products returned for category_key={category_key} category_slug={category_slug}",
+                )
+                conn.commit()
+                raise RuntimeError(
+                    f"No products returned for category_key={category_key} category_slug={category_slug}"
+                )
+
             conn.commit()
 
         raw_count = 0
@@ -144,6 +170,17 @@ def run_pipeline(category_key: str):
         # 4) FINISH RUN
         # -------------------------
         with conn.cursor() as cur:
+            fact_not_empty_status = "pass" if fact_count > 0 else "fail"
+            log_quality_check(
+                cur,
+                run_id,
+                "a101_fact_rows_not_empty",
+                fact_not_empty_status,
+                fact_count,
+                1,
+                "A101 run should promote at least one row to fact when products were scraped.",
+            )
+
             finish_run(
                 cur,
                 run_id=run_id,
@@ -155,6 +192,15 @@ def run_pipeline(category_key: str):
                 records_failed=failed_count,
             )
             conn.commit()
+
+        if fact_count == 0:
+            logger.warning(
+                "A101 run completed without fact rows run_id=%s scraped=%s raw=%s stg=%s",
+                run_id,
+                len(products),
+                raw_count,
+                stg_count,
+            )
 
         logger.info("=" * 40)
         logger.info("A101 RUN COMPLETED")

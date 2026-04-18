@@ -1,10 +1,48 @@
+import logging
+import os
 import re
+
 from playwright.sync_api import sync_playwright
+
+logger = logging.getLogger(__name__)
+
+AUTOMATION_ENV_VARS = ("CI", "GITHUB_ACTIONS")
+HEADLESS_TRUTHY_VALUES = {"1", "true", "yes", "on"}
+
+
+def repair_text(text: str) -> str:
+    if not text:
+        return ""
+
+    if not any(marker in text for marker in ("Ã", "Å", "Ä", "â", "Â")):
+        return text
+
+    for source_encoding in ("cp1252", "latin1"):
+        try:
+            return text.encode(source_encoding).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+
+    return text
+
+
+def normalize_text(text: str) -> str:
+    return " ".join(repair_text(text).split())
+
+
+def should_run_headless() -> bool:
+    override = os.getenv("A101_HEADLESS")
+    if override is not None:
+        return override.strip().lower() in HEADLESS_TRUTHY_VALUES
+
+    return any(os.getenv(env_var) for env_var in AUTOMATION_ENV_VARS)
 
 
 def extract_unit_info(product_name: str):
     if not product_name:
         return None, None
+
+    normalized_name = normalize_text(product_name)
 
     patterns = [
         (r"(\d+(?:[.,]\d+)?)\s*(kg|KG|Kg)", "KG"),
@@ -14,7 +52,7 @@ def extract_unit_info(product_name: str):
     ]
 
     for pattern, unit in patterns:
-        match = re.search(pattern, product_name)
+        match = re.search(pattern, normalized_name)
         if match:
             amount = match.group(1).replace(",", ".")
             try:
@@ -29,6 +67,8 @@ def is_valid_product_name(name: str) -> bool:
     if not name:
         return False
 
+    normalized_name = normalize_text(name)
+
     invalid_fragments = [
         "Popüler Ürünler",
         "Çerez Kullanımı",
@@ -41,7 +81,7 @@ def is_valid_product_name(name: str) -> bool:
     ]
 
     for fragment in invalid_fragments:
-        if fragment.lower() in name.lower():
+        if fragment.lower() in normalized_name.lower():
             return False
 
     return True
@@ -49,17 +89,21 @@ def is_valid_product_name(name: str) -> bool:
 
 def parse_price_from_lines(lines):
     for line in lines:
-        if "₺" in line:
-            raw_price = (
-                line.replace("₺", "")
-                .replace(".", "")
-                .replace(",", ".")
-                .strip()
-            )
+        normalized_line = normalize_text(line)
+        upper_line = normalized_line.upper()
+
+        if "₺" not in normalized_line and "TL" not in upper_line and "TRY" not in upper_line:
+            continue
+
+        price_candidates = re.findall(r"\d[\d.,]*", normalized_line)
+
+        for candidate in price_candidates:
+            raw_price = candidate.replace(".", "").replace(",", ".").strip()
             try:
                 return float(raw_price)
             except ValueError:
                 continue
+
     return None
 
 
@@ -68,11 +112,10 @@ def get_a101_products(category_slug: str):
     products = []
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
+        browser = p.chromium.launch(headless=should_run_headless())
         page = browser.new_page()
         page.goto(url, timeout=60000)
 
-        # Konum popup
         for text in [
             "Bu defalık izin ver",
             "Siteyi ziyaret ederken izin ver",
@@ -84,7 +127,6 @@ def get_a101_products(category_slug: str):
             except Exception:
                 pass
 
-        # Cookie popup
         for text in ["KABUL ET", "Kabul Et", "Tümünü Kabul Et"]:
             try:
                 page.get_by_text(text, exact=True).click(timeout=3000)
@@ -94,35 +136,50 @@ def get_a101_products(category_slug: str):
 
         page.wait_for_timeout(4000)
 
-        # Lazy loading için scroll
         for _ in range(8):
             page.mouse.wheel(0, 2500)
             page.wait_for_timeout(1200)
 
         cards = page.locator("div[class*='product']").all()
 
+        if not cards:
+            logger.warning("No A101 product cards found for category_slug=%s", category_slug)
+
         for i, card in enumerate(cards):
             try:
-                text_blob = card.inner_text().strip()
+                text_blob = repair_text(card.inner_text()).strip()
                 if not text_blob:
                     continue
 
-                lines = [x.strip() for x in text_blob.splitlines() if x.strip()]
+                lines = [
+                    normalize_text(line)
+                    for line in text_blob.splitlines()
+                    if normalize_text(line)
+                ]
                 if not lines:
                     continue
 
                 price = parse_price_from_lines(lines)
                 if price is None:
+                    logger.warning(
+                        "Skipping A101 card index=%s reason=price_not_found",
+                        i,
+                    )
                     continue
 
                 name = None
                 for line in lines:
-                    if "₺" not in line and len(line) > 2:
+                    upper_line = line.upper()
+                    if "₺" not in line and "TL" not in upper_line and "TRY" not in upper_line and len(line) > 2:
                         if is_valid_product_name(line):
                             name = line
                             break
 
                 if not name:
+                    logger.warning(
+                        "Skipping A101 card index=%s reason=name_not_found",
+                        i,
+                    )
                     continue
 
                 extracted_unit, extracted_amount = extract_unit_info(name)
@@ -143,7 +200,12 @@ def get_a101_products(category_slug: str):
                     }
                 )
 
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Skipping A101 card index=%s error=%s",
+                    i,
+                    str(exc),
+                )
                 continue
 
         browser.close()
