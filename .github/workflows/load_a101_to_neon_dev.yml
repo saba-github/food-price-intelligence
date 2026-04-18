@@ -45,3 +45,34 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
           PYTHONPATH: ${{ github.workspace }}
         run: python -m pipeline.run_pipeline --retailer a101 --category fruit_veg
+
+      - name: Refresh materialized views (DEV)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_DEV }}
+        run: |
+          python - <<EOF
+          import psycopg2
+
+          conn = psycopg2.connect("${DATABASE_URL}")
+          cur = conn.cursor()
+
+          views = [
+              "mart_daily_prices",
+              "mart_top_movers",
+              "mart_price_anomalies",
+              "mart_pipeline_health",
+              "mart_latest_prices",
+              "mart_daily_prices_by_retailer",
+          ]
+
+          for v in views:
+              try:
+                  cur.execute(f"REFRESH MATERIALIZED VIEW {v}")
+                  print(f"Refreshed {v}")
+              except Exception as e:
+                  print(f"Skipped {v}: {e}")
+
+          conn.commit()
+          cur.close()
+          conn.close()
+          EOF
