@@ -188,10 +188,24 @@ limit 20
 
 
 CROSS_RETAILER_PRODUCTS_QUERY = """
-SELECT DISTINCT standardized_product_name
+SELECT
+    standardized_product_name
 FROM mart_daily_prices_by_retailer
 WHERE standardized_product_name IS NOT NULL
+GROUP BY standardized_product_name
+HAVING COUNT(DISTINCT source_name) >= 2
 ORDER BY standardized_product_name;
+"""
+
+RETAILER_FRESHNESS_QUERY = """
+SELECT
+    source_name,
+    MAX(date) AS latest_date,
+    COUNT(DISTINCT standardized_product_name) AS tracked_products
+FROM mart_daily_prices_by_retailer
+WHERE source_name IS NOT NULL
+GROUP BY source_name
+ORDER BY latest_date DESC, source_name;
 """
 
 CROSS_RETAILER_COMPARISON_QUERY = """
@@ -207,9 +221,25 @@ ORDER BY date, source_name;
 """
 
 CHEAPEST_RETAILER_TODAY_QUERY = """
-WITH latest_date AS (
+WITH latest_common_date AS (
     SELECT MAX(date) AS max_date
-    FROM mart_daily_prices_by_retailer
+    FROM (
+        SELECT date
+        FROM mart_daily_prices_by_retailer
+        GROUP BY date
+        HAVING COUNT(DISTINCT source_name) >= 2
+    ) shared_dates
+),
+shared_products AS (
+    SELECT
+        m.date,
+        m.standardized_product_name
+    FROM mart_daily_prices_by_retailer m
+    JOIN latest_common_date lcd
+      ON m.date = lcd.max_date
+    WHERE m.standardized_product_name IS NOT NULL
+    GROUP BY m.date, m.standardized_product_name
+    HAVING COUNT(DISTINCT m.source_name) >= 2
 ),
 ranked AS (
     SELECT
@@ -222,8 +252,9 @@ ranked AS (
             ORDER BY m.avg_price ASC
         ) AS price_rank
     FROM mart_daily_prices_by_retailer m
-    JOIN latest_date ld
-      ON m.date = ld.max_date
+    JOIN shared_products sp
+      ON m.date = sp.date
+     AND m.standardized_product_name = sp.standardized_product_name
 )
 SELECT
     date,

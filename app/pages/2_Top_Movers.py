@@ -182,6 +182,13 @@ def fmt_pct(x, digits=1):
     return f"{sign}{float(x):.{digits}f}%"
 
 
+def format_snapshot_date(value):
+    parsed = pd.to_datetime(value, errors="coerce")
+    if pd.isna(parsed):
+        return "Latest available data"
+    return parsed.strftime("%b %d, %Y").replace(" 0", " ")
+
+
 def build_dark_figure(fig, height=420):
     fig.update_layout(
         height=height,
@@ -230,7 +237,14 @@ largest_increase = top_gainer["pct_change"] if top_gainer is not None else None
 largest_drop = top_loser["pct_change"] if top_loser is not None else None
 
 total_movers = len(movers_df) + len(decliners_df)
-latest_snapshot = "Apr 10, 2026"
+
+snapshot_candidates = []
+if not movers_df.empty and "date" in movers_df.columns:
+    snapshot_candidates.extend(pd.to_datetime(movers_df["date"], errors="coerce").dropna().tolist())
+if not decliners_df.empty and "date" in decliners_df.columns:
+    snapshot_candidates.extend(pd.to_datetime(decliners_df["date"], errors="coerce").dropna().tolist())
+
+latest_snapshot = format_snapshot_date(max(snapshot_candidates) if snapshot_candidates else None)
 
 # --------------------------------------------------
 # Hero

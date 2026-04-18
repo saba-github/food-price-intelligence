@@ -208,6 +208,13 @@ def fmt_num(x, digits=2):
     return f"{float(x):,.{digits}f}"
 
 
+def format_snapshot_date(value):
+    parsed = pd.to_datetime(value, errors="coerce")
+    if pd.isna(parsed):
+        return "Latest available run"
+    return parsed.strftime("%b %d, %Y").replace(" 0", " ")
+
+
 def build_dark_figure(fig, height=420):
     fig.update_layout(
         height=height,
@@ -268,7 +275,8 @@ latest_duration = latest.get("run_duration_seconds")
 latest_failed_check = latest.get("last_failed_check_name")
 latest_failed_details = latest.get("last_failed_check_details")
 
-latest_snapshot = "Apr 10, 2026"
+latest_snapshot_source = latest.get("finished_at") if pd.notna(latest.get("finished_at")) else latest.get("started_at")
+latest_snapshot = format_snapshot_date(latest_snapshot_source)
 
 # --------------------------------------------------
 # Hero
