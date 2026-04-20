@@ -16,7 +16,7 @@ def normalize_input(text: str) -> str:
     return " ".join(normalized.split())
 
 
-def find_product_id(cursor, user_input: str) -> int | None:
+def find_product_match(cursor, user_input: str) -> dict:
     normalized_input = normalize_input(user_input)
 
     try:
@@ -30,10 +30,50 @@ def find_product_id(cursor, user_input: str) -> int | None:
             (normalized_input,),
         )
         row = cursor.fetchone()
+
+        if row:
+            return {
+                "product_id": row[0],
+                "found": True,
+                "match_type": "alias_exact",
+                "normalized_input": normalized_input,
+            }
+
+        cursor.execute(
+            """
+            SELECT product_id
+            FROM dim_products
+            WHERE standardized_product_name = %s
+            LIMIT 1;
+            """,
+            (normalized_input,),
+        )
+        row = cursor.fetchone()
+
+        if row:
+            return {
+                "product_id": row[0],
+                "found": True,
+                "match_type": "product_exact",
+                "normalized_input": normalized_input,
+            }
+
     except Exception:
-        return None
+        return {
+            "product_id": None,
+            "found": False,
+            "match_type": "lookup_error",
+            "normalized_input": normalized_input,
+        }
 
-    if not row:
-        return None
+    return {
+        "product_id": None,
+        "found": False,
+        "match_type": "no_match",
+        "normalized_input": normalized_input,
+    }
 
-    return row[0]
+
+def find_product_id(cursor, user_input: str) -> int | None:
+    result = find_product_match(cursor, user_input)
+    return result["product_id"]
