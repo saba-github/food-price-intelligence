@@ -1,8 +1,8 @@
-
-from pipeline.optimizer.matching import find_product_id
+from pipeline.optimizer.matching import find_product_match
 from pipeline.optimizer.pricing import (
     calculate_single_market_basket,
     calculate_split_basket,
+    get_latest_prices,
 )
 
 
@@ -10,12 +10,34 @@ def optimize_basket(cursor, user_inputs: list[str]) -> dict:
     matched_products = []
 
     for user_input in user_inputs:
-        product_id = find_product_id(cursor, user_input)
+        match = find_product_match(cursor, user_input)
+
+        available_markets = []
+        standardized_product_name = None
+
+        if match["product_id"] is not None:
+            prices = get_latest_prices(cursor, match["product_id"])
+            available_markets = sorted(
+                list(
+                    {
+                        p["source_name"]
+                        for p in prices
+                        if p.get("source_name")
+                    }
+                )
+            )
+            if prices:
+                standardized_product_name = prices[0].get("standardized_product_name")
+
         matched_products.append(
             {
                 "input": user_input,
-                "product_id": product_id,
-                "found": product_id is not None,
+                "normalized_input": match["normalized_input"],
+                "product_id": match["product_id"],
+                "found": match["found"],
+                "match_type": match["match_type"],
+                "standardized_product_name": standardized_product_name,
+                "available_markets": available_markets,
             }
         )
 

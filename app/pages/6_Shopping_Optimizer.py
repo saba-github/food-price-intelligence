@@ -125,31 +125,49 @@ if st.button("Sepeti Hesapla", use_container_width=True):
             st.markdown("### Girilen Ürünler")
             st.write(", ".join(user_inputs))
 
-            if not matched_df.empty and "found" in matched_df.columns:
-                missing_df = matched_df[matched_df["found"] == False]
-                if not missing_df.empty:
-                    st.markdown("### Bulunamayan Ürünler")
-                    st.write(", ".join(missing_df["input"].astype(str).tolist()))
+            if not matched_df.empty:
+                no_match_df = matched_df[matched_df["found"] == False]
+                if not no_match_df.empty:
+                    st.markdown("### Eşleşmeyen Ürünler")
+                    for _, row in no_match_df.iterrows():
+                        st.write(f"- {row['input']} (neden: {row['match_type']})")
+
+                matched_only_df = matched_df[matched_df["found"] == True]
+                if not matched_only_df.empty:
+                    st.markdown("### Eşleşen Ürünler ve Market Kapsamı")
+                    for _, row in matched_only_df.iterrows():
+                        product_name = row.get("standardized_product_name") or row["input"]
+                        markets = row.get("available_markets") or []
+                        if markets:
+                            st.write(f"- {product_name}: {', '.join(markets)}")
+                        else:
+                            st.write(f"- {product_name}: market verisi yok")
 
             st.markdown("### En Ucuz Alışveriş Planı")
             split_items = split_basket.get("items", [])
 
-            if split_items:
+            valid_items = [item for item in split_items if item.get("availability_status") == "ok"]
+            invalid_items = [item for item in split_items if item.get("availability_status") != "ok"]
+
+            if valid_items:
                 grouped = defaultdict(list)
-                for item in split_items:
+                for item in valid_items:
                     grouped[item["market"]].append(item)
 
                 for market, items in grouped.items():
                     st.markdown(f"#### {market.upper()}")
                     for item in items:
-                        product_name = item.get("product_name") or "Bilinmeyen ürün"
+                        product_name = item.get("product_name") or f"Ürün #{item.get('product_id')}"
                         selected_price = item.get("selected_price")
-                        if selected_price is None:
-                            st.write(f"- {product_name}")
-                        else:
-                            st.write(f"- {product_name} — ₺{selected_price:,.2f}")
+                        st.write(f"- {product_name} — ₺{selected_price:,.2f}")
             else:
                 st.info("Bölünmüş sepet için yeterli veri bulunamadı.")
+
+            if invalid_items:
+                st.markdown("### Fiyatı Bulunamayan Eşleşmiş Ürünler")
+                for item in invalid_items:
+                    product_name = item.get("product_name") or f"Ürün #{item.get('product_id')}"
+                    st.write(f"- {product_name} (durum: {item.get('availability_status')})")
 
             st.markdown("### Tek Market Alternatifleri")
             if single_market_options:
