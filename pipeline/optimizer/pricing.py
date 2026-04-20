@@ -96,9 +96,35 @@ def calculate_split_basket(cursor, product_ids: list[int]) -> dict:
 
     for product_id in product_ids:
         prices = get_latest_prices(cursor, product_id)
+
+        if not prices:
+            items.append(
+                {
+                    "product_id": product_id,
+                    "product_name": None,
+                    "market": None,
+                    "price": None,
+                    "price_per_unit": None,
+                    "selected_price": None,
+                    "availability_status": "no_prices_found",
+                }
+            )
+            continue
+
         cheapest = get_cheapest_price(prices)
 
         if cheapest is None:
+            items.append(
+                {
+                    "product_id": product_id,
+                    "product_name": prices[0].get("standardized_product_name"),
+                    "market": None,
+                    "price": None,
+                    "price_per_unit": None,
+                    "selected_price": None,
+                    "availability_status": "no_valid_price",
+                }
+            )
             continue
 
         selected_price = get_selected_price(cheapest)
@@ -111,6 +137,7 @@ def calculate_split_basket(cursor, product_ids: list[int]) -> dict:
                 "price": cheapest.get("price"),
                 "price_per_unit": cheapest.get("price_per_unit"),
                 "selected_price": selected_price,
+                "availability_status": "ok",
             }
         )
 
