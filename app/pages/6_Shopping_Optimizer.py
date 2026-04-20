@@ -129,13 +129,9 @@ if st.button("Sepeti Hesapla", use_container_width=True):
                 missing_df = matched_df[matched_df["found"] == False]
                 if not missing_df.empty:
                     st.markdown("### Bulunamayan Ürünler")
-                    st.dataframe(
-                        missing_df[["input"]],
-                        use_container_width=True,
-                        hide_index=True,
-                    )
+                    st.write(", ".join(missing_df["input"].astype(str).tolist()))
 
-            st.markdown("### Bölünmüş Sepet Detayı")
+            st.markdown("### En Ucuz Alışveriş Planı")
             split_items = split_basket.get("items", [])
 
             if split_items:
@@ -145,35 +141,29 @@ if st.button("Sepeti Hesapla", use_container_width=True):
 
                 for market, items in grouped.items():
                     st.markdown(f"#### {market.upper()}")
-                    market_rows = []
                     for item in items:
-                        market_rows.append(
-                            {
-                                "product_id": item.get("product_id"),
-                                "selected_price": item.get("selected_price"),
-                                "price_per_unit": item.get("price_per_unit"),
-                            }
-                        )
-                    st.dataframe(
-                        pd.DataFrame(market_rows),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
+                        product_name = item.get("product_name") or "Bilinmeyen ürün"
+                        selected_price = item.get("selected_price")
+                        if selected_price is None:
+                            st.write(f"- {product_name}")
+                        else:
+                            st.write(f"- {product_name} — ₺{selected_price:,.2f}")
             else:
                 st.info("Bölünmüş sepet için yeterli veri bulunamadı.")
 
             st.markdown("### Tek Market Alternatifleri")
             if single_market_options:
-                st.dataframe(
-                    pd.DataFrame(single_market_options),
-                    use_container_width=True,
-                    hide_index=True,
+                single_market_df = pd.DataFrame(single_market_options).copy()
+                single_market_df = single_market_df.rename(
+                    columns={
+                        "market": "Market",
+                        "items_count": "Karşılanan Ürün",
+                        "total_price": "Toplam Tutar",
+                    }
                 )
+                st.dataframe(single_market_df, use_container_width=True, hide_index=True)
             else:
                 st.info("Hiçbir tek market tüm eşleşen ürünleri karşılamıyor.")
-
-            st.markdown("### Eşleşme Detayı")
-            st.dataframe(matched_df, use_container_width=True, hide_index=True)
 
         except Exception as exc:
             st.error(f"Hata: {exc}")
