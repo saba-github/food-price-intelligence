@@ -12,6 +12,7 @@ def get_latest_prices(cursor, product_id: int) -> list[dict]:
         """
         SELECT
             source_name,
+            standardized_product_name,
             price_per_unit,
             price
         FROM mart_latest_prices
@@ -25,8 +26,9 @@ def get_latest_prices(cursor, product_id: int) -> list[dict]:
     return [
         {
             "source_name": row[0],
-            "price_per_unit": row[1],
-            "price": row[2],
+            "standardized_product_name": row[1],
+            "price_per_unit": row[2],
+            "price": row[3],
         }
         for row in rows
     ]
@@ -104,6 +106,7 @@ def calculate_split_basket(cursor, product_ids: list[int]) -> dict:
         items.append(
             {
                 "product_id": product_id,
+                "product_name": cheapest.get("standardized_product_name"),
                 "market": cheapest["source_name"],
                 "price": cheapest.get("price"),
                 "price_per_unit": cheapest.get("price_per_unit"),
