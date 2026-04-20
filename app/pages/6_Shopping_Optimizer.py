@@ -80,12 +80,34 @@ if st.button("Sepeti Hesapla", use_container_width=True):
 
             result = optimize_basket(cursor, user_inputs)
 
-            matched_df = pd.DataFrame(result["matched_products"])
-            split_basket = result["split_basket"]
-            split_basket_total = split_basket["total_price"]
-            single_market_options = result["single_market_options"]
+            matched_df = pd.DataFrame(result.get("matched_products", []))
+            split_basket = result.get("split_basket", {"items": [], "total_price": 0})
+            split_basket_total = split_basket.get("total_price", 0)
+            single_market_options = result.get("single_market_options", [])
 
-            found_count = int(matched_df["found"].sum()) if not matched_df.empty and "found" in matched_df.columns else 0
+            if not matched_df.empty:
+                if "found" not in matched_df.columns:
+                    matched_df["found"] = False
+                if "match_type" not in matched_df.columns:
+                    matched_df["match_type"] = "unknown"
+                if "standardized_product_name" not in matched_df.columns:
+                    matched_df["standardized_product_name"] = None
+                if "available_markets" not in matched_df.columns:
+                    matched_df["available_markets"] = [[] for _ in range(len(matched_df))]
+                if "input" not in matched_df.columns:
+                    matched_df["input"] = ""
+            else:
+                matched_df = pd.DataFrame(
+                    columns=[
+                        "input",
+                        "found",
+                        "match_type",
+                        "standardized_product_name",
+                        "available_markets",
+                    ]
+                )
+
+            found_count = int(matched_df["found"].sum()) if not matched_df.empty else 0
             missing_count = len(matched_df) - found_count if not matched_df.empty else 0
 
             cheapest_single_market_total = None
@@ -125,41 +147,45 @@ if st.button("Sepeti Hesapla", use_container_width=True):
             st.markdown("### Girilen Ürünler")
             st.write(", ".join(user_inputs))
 
-            if not matched_df.empty:
-                no_match_df = matched_df[matched_df["found"] == False]
-                if not no_match_df.empty:
-                    st.markdown("### Eşleşmeyen Ürünler")
-                    for _, row in no_match_df.iterrows():
-                        st.write(f"- {row['input']} (neden: {row['match_type']})")
+            no_match_df = matched_df[matched_df["found"] == False]
+            if not no_match_df.empty:
+                st.markdown("### Eşleşmeyen Ürünler")
+                for _, row in no_match_df.iterrows():
+                    match_reason = row.get("match_type", "unknown")
+                    st.write(f"- {row.get('input', '')} (neden: {match_reason})")
 
-                matched_only_df = matched_df[matched_df["found"] == True]
-                if not matched_only_df.empty:
-                    st.markdown("### Eşleşen Ürünler ve Market Kapsamı")
-                    for _, row in matched_only_df.iterrows():
-                        product_name = row.get("standardized_product_name") or row["input"]
-                        markets = row.get("available_markets") or []
-                        if markets:
-                            st.write(f"- {product_name}: {', '.join(markets)}")
-                        else:
-                            st.write(f"- {product_name}: market verisi yok")
+            matched_only_df = matched_df[matched_df["found"] == True]
+            if not matched_only_df.empty:
+                st.markdown("### Eşleşen Ürünler ve Market Kapsamı")
+                for _, row in matched_only_df.iterrows():
+                    product_name = row.get("standardized_product_name") or row.get("input", "")
+                    markets = row.get("available_markets", [])
+                    if isinstance(markets, list) and markets:
+                        st.write(f"- {product_name}: {', '.join(markets)}")
+                    else:
+                        st.write(f"- {product_name}: market verisi yok")
 
             st.markdown("### En Ucuz Alışveriş Planı")
             split_items = split_basket.get("items", [])
 
-            valid_items = [item for item in split_items if item.get("availability_status") == "ok"]
-            invalid_items = [item for item in split_items if item.get("availability_status") != "ok"]
+            valid_items = [item for item in split_items if item.get("availability_status", "ok") == "ok"]
+            invalid_items = [item for item in split_items if item.get("availability_status", "ok") != "ok"]
 
             if valid_items:
                 grouped = defaultdict(list)
                 for item in valid_items:
-                    grouped[item["market"]].append(item)
+                    market = item.get("market") or "bilinmeyen"
+                    grouped[market].append(item)
 
                 for market, items in grouped.items():
-                    st.markdown(f"#### {market.upper()}")
+                    st.markdown(f"#### {str(market).upper()}")
                     for item in items:
                         product_name = item.get("product_name") or f"Ürün #{item.get('product_id')}"
                         selected_price = item.get("selected_price")
-                        st.write(f"- {product_name} — ₺{selected_price:,.2f}")
+                        if selected_price is not None:
+                            st.write(f"- {product_name} — ₺{selected_price:,.2f}")
+                        else:
+                            st.write(f"- {product_name}")
             else:
                 st.info("Bölünmüş sepet için yeterli veri bulunamadı.")
 
@@ -167,7 +193,8 @@ if st.button("Sepeti Hesapla", use_container_width=True):
                 st.markdown("### Fiyatı Bulunamayan Eşleşmiş Ürünler")
                 for item in invalid_items:
                     product_name = item.get("product_name") or f"Ürün #{item.get('product_id')}"
-                    st.write(f"- {product_name} (durum: {item.get('availability_status')})")
+                    status = item.get("availability_status", "unknown")
+                    st.write(f"- {product_name} (durum: {status})")
 
             st.markdown("### Tek Market Alternatifleri")
             if single_market_options:
