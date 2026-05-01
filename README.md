@@ -1,35 +1,64 @@
-# Food Price Intelligence
+## UcuzSepet – Food Price Intelligence
 
-A production-style data pipeline that collects, processes, and analyzes grocery price data.
+A system for comparing grocery prices across retailers in Turkey.
+
+Goal:  
+Answer a simple question: “En ucuz nerede?”
+
+---
 
 ## What it does
 
-- Scrapes real product prices (Migros)
-- Stores raw data in PostgreSQL (Neon)
-- Transforms into structured datasets (raw → staging → fact)
-- Applies data quality checks & anomaly detection
-- Serves insights via a Streamlit dashboard
+- Collects prices from multiple retailers (Migros, A101)
+- Normalizes product names and units (kg, liter, roll)
+- Matches equivalent products safely
+- Calculates comparable unit prices (e.g., TL/kg, TL/roll)
+- Returns the cheapest option with a confidence level
 
-## Architecture
-
-Source → Raw → Staging → Fact → Mart → Dashboard
-
-## Tech Stack
-
-- Python (ETL)
-- PostgreSQL (Neon)
-- GitHub Actions (CI/CD)
-- Streamlit
+---
 
 ## Key Features
 
-- Idempotent data ingestion
-- Data quality validation
-- Automated pipelines
-- Analytical marts
-- Price trend tracking
+- Safe matching  
+  Avoids incorrect comparisons using brand, size and product-line awareness
 
-## Why this project
+- Smart search  
+  Handles real queries like:  
+  tuvalet kağıdı, kagit havlu, 8'li kağıt havlu
 
-Built to simulate real-world data engineering systems  
-with a focus on reliability and data quality.
+- Unit-aware pricing  
+  Ensures fair comparison across different package sizes
+
+- Confidence system  
+  Results are labeled as comparable or review_required
+
+---
+
+## Stack
+
+- Python (data pipeline)
+- PostgreSQL (Neon)
+- Streamlit (UI)
+- Playwright (scraping)
+- GitHub Actions (CI/CD)
+
+---
+
+## Example
+
+Query: tuvalet kağıdı  
+Result: A101 is cheaper than Migros based on TL/roll comparison
+
+---
+
+## Roadmap
+
+- Cleaning products (detergents)
+- Basket optimization
+- Price history tracking
+
+---
+
+## Author
+
+Sabahat Sengezer
