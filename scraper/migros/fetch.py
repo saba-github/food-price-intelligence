@@ -1,6 +1,5 @@
-import requests
-
 from scraper.migros.extract import parse_migros_products
+from scraper.migros.http import get_json
 
 
 SEARCH_BASE_URL = "https://www.migros.com.tr/rest/search/screens/products"
@@ -19,15 +18,12 @@ def get_migros_products(query: str = "domates") -> list[dict]:
         "x-pwa": "true",
     }
 
-    response = requests.get(
+    api_json = get_json(
         SEARCH_BASE_URL,
         params=params,
         headers=headers,
         timeout=30,
     )
-    response.raise_for_status()
-
-    api_json = response.json()
     products = parse_migros_products(api_json)
 
     return products

@@ -1,44 +1,14 @@
+from pipeline.transforms import standardize_product_name
+
+
 def normalize_input(text: str) -> str:
-    normalized = text.lower()
-
-    tr_map = {
-        "ı": "i",
-        "ğ": "g",
-        "ü": "u",
-        "ş": "s",
-        "ö": "o",
-        "ç": "c",
-    }
-
-    for old, new in tr_map.items():
-        normalized = normalized.replace(old, new)
-
-    return " ".join(normalized.split())
+    return standardize_product_name(text) or ""
 
 
 def find_product_match(cursor, user_input: str) -> dict:
     normalized_input = normalize_input(user_input)
 
     try:
-        cursor.execute(
-            """
-            SELECT product_id
-            FROM dim_product_aliases
-            WHERE normalized_alias = %s
-            LIMIT 1;
-            """,
-            (normalized_input,),
-        )
-        row = cursor.fetchone()
-
-        if row:
-            return {
-                "product_id": row[0],
-                "found": True,
-                "match_type": "alias_exact",
-                "normalized_input": normalized_input,
-            }
-
         cursor.execute(
             """
             SELECT product_id
@@ -55,6 +25,25 @@ def find_product_match(cursor, user_input: str) -> dict:
                 "product_id": row[0],
                 "found": True,
                 "match_type": "product_exact",
+                "normalized_input": normalized_input,
+            }
+
+        cursor.execute(
+            """
+            SELECT product_id
+            FROM dim_product_aliases
+            WHERE normalized_alias = %s
+            LIMIT 1;
+            """,
+            (normalized_input,),
+        )
+        row = cursor.fetchone()
+
+        if row:
+            return {
+                "product_id": row[0],
+                "found": True,
+                "match_type": "alias_exact",
                 "normalized_input": normalized_input,
             }
 

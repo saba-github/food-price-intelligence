@@ -3,7 +3,7 @@ import os
 import re
 import sys
 
-import psycopg2
+from database.connection import get_connection
 
 
 MIGRATION_NAME_PATTERN = re.compile(r"^\d{3}_.+\.sql$")
@@ -14,15 +14,11 @@ def _sha256(content: str) -> str:
 
 
 def main():
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        raise ValueError("DATABASE_URL is required.")
-
     migrations_dir = os.path.join("database", "migrations")
     if not os.path.isdir(migrations_dir):
         raise FileNotFoundError(f"Missing migrations directory: {migrations_dir}")
 
-    conn = psycopg2.connect(database_url)
+    conn = get_connection(application_name="run-migrations")
 
     try:
         conn.autocommit = False

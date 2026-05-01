@@ -1,6 +1,28 @@
 from typing import Optional
 
 
+def ensure_product_alias(cursor, product_id: int, alias_text: str) -> None:
+    if not alias_text:
+        return
+
+    cursor.execute(
+        """
+        INSERT INTO dim_product_aliases (
+            product_id,
+            alias_text,
+            normalized_alias
+        )
+        VALUES (%s, %s, %s)
+        ON CONFLICT (normalized_alias) DO NOTHING
+        """,
+        (
+            product_id,
+            alias_text,
+            alias_text,
+        ),
+    )
+
+
 def get_or_create_product_id(
     cursor,
     standardized_product_name: str,
@@ -20,7 +42,9 @@ def get_or_create_product_id(
     row = cursor.fetchone()
 
     if row:
-        return row[0]
+        product_id = row[0]
+        ensure_product_alias(cursor, product_id, standardized_product_name)
+        return product_id
 
     cursor.execute(
         """
@@ -39,4 +63,6 @@ def get_or_create_product_id(
         ),
     )
 
-    return cursor.fetchone()[0]
+    product_id = cursor.fetchone()[0]
+    ensure_product_alias(cursor, product_id, standardized_product_name)
+    return product_id

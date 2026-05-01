@@ -1,9 +1,5 @@
-import os
-import psycopg2
+from database.connection import get_connection as get_shared_connection
 
 
 def get_connection():
-    database_url = os.getenv("DATABASE_URL")
-    if not database_url:
-        raise ValueError("DATABASE_URL environment variable is not set.")
-    return psycopg2.connect(database_url)
+    return get_shared_connection(application_name="pipeline")

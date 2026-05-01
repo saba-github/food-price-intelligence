@@ -1,7 +1,6 @@
-import os
-import psycopg2
+from database.connection import get_connection
 
-conn = psycopg2.connect(os.getenv("DATABASE_URL"))
+conn = get_connection(application_name="debug-muz")
 cur = conn.cursor()
 
 print("DIM_PRODUCTS:")

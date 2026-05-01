@@ -24,8 +24,14 @@ def refresh_materialized_views(cursor):
         if not exists:
             continue
 
+        savepoint_name = f"refresh_{view_name}"
+        cursor.execute(f"SAVEPOINT {savepoint_name}")
+
         try:
             cursor.execute(f"REFRESH MATERIALIZED VIEW {view_name}")
         except Exception as e:
+            cursor.execute(f"ROLLBACK TO SAVEPOINT {savepoint_name}")
             # do NOT crash pipeline
             print(f"[WARN] Failed to refresh {view_name}: {e}")
+        finally:
+            cursor.execute(f"RELEASE SAVEPOINT {savepoint_name}")

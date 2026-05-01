@@ -1,6 +1,9 @@
+import argparse
 import os
 import logging
 from typing import Any
+
+from dotenv import load_dotenv
 
 from config.retailers import RETAILER_CONFIG
 from pipeline.db import get_connection
@@ -12,15 +15,20 @@ from pipeline.loaders_staging import (
     insert_stg_observation,
     insert_stg_source_product,
 )
+from pipeline.marts import refresh_materialized_views
+from pipeline.quality import log_quality_check
 from pipeline.run_lifecycle import start_run, finish_run, fail_run
 from pipeline.transforms import transform_product
 from scraper.a101.categories import get_a101_category_products
+
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 source_name = RETAILER_CONFIG["a101"]["source_name"]
 currency = RETAILER_CONFIG["a101"]["currency"]
+DEFAULT_CATEGORY_KEY = "fruit_veg"
 PIPELINE_VERSION = "v2-a101-001"
 
 
@@ -31,6 +39,12 @@ def resolve_triggered_by() -> str:
 
 
 def run_pipeline(category_key: str):
+    if category_key not in RETAILER_CONFIG["a101"]["categories"]:
+        valid_keys = ", ".join(RETAILER_CONFIG["a101"]["categories"].keys())
+        raise ValueError(
+            f"Invalid category_key={category_key!r}. Valid options: {valid_keys}"
+        )
+
     category_slug = RETAILER_CONFIG["a101"]["categories"][category_key]
 
     conn = None
@@ -58,6 +72,28 @@ def run_pipeline(category_key: str):
                 pipeline_version=PIPELINE_VERSION,
             )
             conn.commit()
+
+        if not products:
+            with conn.cursor() as cur:
+                log_quality_check(
+                    cur,
+                    run_id,
+                    "category_scrape_not_empty",
+                    "fail",
+                    0,
+                    1,
+                    f"No products returned for retailer={source_name} category_key={category_key}",
+                )
+                fail_run(
+                    cur,
+                    run_id,
+                    f"No products returned for category_key={category_key} category_slug={category_slug}",
+                )
+                conn.commit()
+
+            raise RuntimeError(
+                f"No products returned for category_key={category_key} category_slug={category_slug}"
+            )
 
         raw_count = 0
         stg_count = 0
@@ -162,6 +198,7 @@ def run_pipeline(category_key: str):
                 records_suspicious=0,
                 records_failed=failed_count,
             )
+            refresh_materialized_views(cur)
             conn.commit()
 
         logger.info("=" * 40)
@@ -192,3 +229,15 @@ def run_pipeline(category_key: str):
     finally:
         if conn:
             conn.close()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--category", default=DEFAULT_CATEGORY_KEY)
+    args = parser.parse_args()
+
+    run_pipeline(args.category)
+
+
+if __name__ == "__main__":
+    main()

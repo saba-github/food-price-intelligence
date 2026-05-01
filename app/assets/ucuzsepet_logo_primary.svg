@@ -1,0 +1,12 @@
+<svg width="420" height="146" viewBox="0 0 420 146" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="UcuzSepet logo">
+  <rect width="420" height="146" rx="18" fill="#F4F1EA"/>
+  <g transform="translate(78 44)">
+    <rect x="0" y="0" width="58" height="58" rx="13" fill="#2C5E11"/>
+    <path d="M17.5 18.2H44.1L40.9 36.6C40.5 38.9 38.5 40.6 36.2 40.6H22.4C20 40.6 18 38.8 17.7 36.4L15.8 12.9H11.4" stroke="#B5E469" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M22.4 24.2L27.8 29.4L37.5 20.1" stroke="#B5E469" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="24.5" cy="47.2" r="2.7" fill="#B5E469"/>
+    <circle cx="37.5" cy="47.2" r="2.7" fill="#B5E469"/>
+  </g>
+  <text x="156" y="67" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" letter-spacing="0.3" fill="#2C5E11">ucuz</text>
+  <text x="156" y="100" font-family="Georgia, 'Times New Roman', serif" font-size="30" font-weight="700" letter-spacing="1.8" fill="#8B8A83">SEPET</text>
+</svg>
