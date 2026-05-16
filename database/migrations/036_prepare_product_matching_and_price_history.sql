@@ -33,13 +33,19 @@ INSERT INTO dim_product_aliases (
     alias_text,
     normalized_alias
 )
-SELECT
-    product_id,
-    standardized_product_name AS alias_text,
-    standardized_product_name AS normalized_alias
-FROM dim_products
-WHERE standardized_product_name IS NOT NULL
-  AND standardized_product_name <> ''
+SELECT DISTINCT ON (dp.standardized_product_name)
+    dp.product_id,
+    dp.standardized_product_name AS alias_text,
+    dp.standardized_product_name AS normalized_alias
+FROM dim_products dp
+WHERE dp.standardized_product_name IS NOT NULL
+  AND dp.standardized_product_name <> ''
+  AND NOT EXISTS (
+      SELECT 1
+      FROM dim_product_aliases dpa
+      WHERE dpa.normalized_alias = dp.standardized_product_name
+  )
+ORDER BY dp.standardized_product_name, dp.product_id
 ON CONFLICT (normalized_alias) DO NOTHING;
 
 WITH alias_rules(alias_text, normalized_alias, match_pattern) AS (
@@ -76,10 +82,15 @@ INSERT INTO dim_product_aliases (
     normalized_alias
 )
 SELECT
-    product_id,
-    alias_text,
-    normalized_alias
-FROM alias_candidates
+    ac.product_id,
+    ac.alias_text,
+    ac.normalized_alias
+FROM alias_candidates ac
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM dim_product_aliases dpa
+    WHERE dpa.normalized_alias = ac.normalized_alias
+)
 ON CONFLICT (normalized_alias) DO NOTHING;
 
 CREATE OR REPLACE VIEW price_history AS
