@@ -21,31 +21,45 @@ UPDATE stg_normalized_observations
 SET standardized_product_name = replace(standardized_product_name, U&'\0069\0307', 'i')
 WHERE standardized_product_name LIKE '%' || U&'\0069\0307' || '%';
 
-UPDATE dim_product_aliases
+UPDATE dim_product_aliases AS dpa
 SET
-    alias_text = replace(alias_text, U&'\0069\0307', 'i'),
-    normalized_alias = replace(normalized_alias, U&'\0069\0307', 'i')
-WHERE alias_text LIKE '%' || U&'\0069\0307' || '%'
-   OR normalized_alias LIKE '%' || U&'\0069\0307' || '%';
+    alias_text = replace(dpa.alias_text, U&'\0069\0307', 'i'),
+    normalized_alias = replace(dpa.normalized_alias, U&'\0069\0307', 'i')
+WHERE (
+    dpa.alias_text LIKE '%' || U&'\0069\0307' || '%'
+    OR dpa.normalized_alias LIKE '%' || U&'\0069\0307' || '%'
+)
+AND NOT EXISTS (
+    SELECT 1
+    FROM dim_product_aliases AS existing
+    WHERE existing.normalized_alias = replace(dpa.normalized_alias, U&'\0069\0307', 'i')
+      AND existing.alias_id <> dpa.alias_id
+);
 
 INSERT INTO dim_product_aliases (
     product_id,
     alias_text,
     normalized_alias
 )
-SELECT DISTINCT ON (dp.standardized_product_name)
-    dp.product_id,
-    dp.standardized_product_name AS alias_text,
-    dp.standardized_product_name AS normalized_alias
-FROM dim_products dp
-WHERE dp.standardized_product_name IS NOT NULL
-  AND dp.standardized_product_name <> ''
-  AND NOT EXISTS (
-      SELECT 1
-      FROM dim_product_aliases dpa
-      WHERE dpa.normalized_alias = dp.standardized_product_name
-  )
-ORDER BY dp.standardized_product_name, dp.product_id
+SELECT
+    new_aliases.product_id,
+    new_aliases.alias_text,
+    new_aliases.normalized_alias
+FROM (
+    SELECT DISTINCT ON (dp.standardized_product_name)
+        dp.product_id,
+        dp.standardized_product_name AS alias_text,
+        dp.standardized_product_name AS normalized_alias
+    FROM dim_products dp
+    WHERE dp.standardized_product_name IS NOT NULL
+      AND dp.standardized_product_name <> ''
+    ORDER BY dp.standardized_product_name, dp.product_id
+) AS new_aliases
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM dim_product_aliases dpa
+    WHERE dpa.normalized_alias = new_aliases.normalized_alias
+)
 ON CONFLICT (normalized_alias) DO NOTHING;
 
 WITH alias_rules(alias_text, normalized_alias, match_pattern) AS (
@@ -82,14 +96,21 @@ INSERT INTO dim_product_aliases (
     normalized_alias
 )
 SELECT
-    ac.product_id,
-    ac.alias_text,
-    ac.normalized_alias
-FROM alias_candidates ac
+    new_rule_aliases.product_id,
+    new_rule_aliases.alias_text,
+    new_rule_aliases.normalized_alias
+FROM (
+    SELECT DISTINCT ON (ac.normalized_alias)
+        ac.product_id,
+        ac.alias_text,
+        ac.normalized_alias
+    FROM alias_candidates ac
+    ORDER BY ac.normalized_alias, ac.product_id
+) AS new_rule_aliases
 WHERE NOT EXISTS (
     SELECT 1
     FROM dim_product_aliases dpa
-    WHERE dpa.normalized_alias = ac.normalized_alias
+    WHERE dpa.normalized_alias = new_rule_aliases.normalized_alias
 )
 ON CONFLICT (normalized_alias) DO NOTHING;
 
