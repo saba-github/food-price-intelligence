@@ -43,6 +43,8 @@ def test_latest_price_history_query_canonicalizes_water_salt_and_cola_groups():
     source = inspect.getsource(pricing.get_latest_price_history_prices)
 
     assert "THEN 'su'" in source
+    assert "standardized_product_name ILIKE '%%camasir%%'" in source
+    assert "standardized_product_name ILIKE '%%suyu%%'" in source
     assert "THEN 'tuz'" in source
     assert "THEN 'kola pepsi'" in source
     assert "THEN 'kola coca-cola'" in source

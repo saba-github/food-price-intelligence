@@ -33,6 +33,8 @@ def test_public_catalog_query_groups_tava_ekmek_variants():
 
 def test_public_catalog_query_canonicalizes_water_salt_and_cola_groups():
     assert "THEN 'su'" in PUBLIC_PRODUCT_CATALOG_QUERY
+    assert "standardized_product_name ILIKE '%camasir%'" in PUBLIC_PRODUCT_CATALOG_QUERY
+    assert "standardized_product_name ILIKE '%suyu%'" in PUBLIC_PRODUCT_CATALOG_QUERY
     assert "THEN 'tuz'" in PUBLIC_PRODUCT_CATALOG_QUERY
     assert "THEN 'kola pepsi'" in PUBLIC_PRODUCT_CATALOG_QUERY
     assert "THEN 'kola coca-cola'" in PUBLIC_PRODUCT_CATALOG_QUERY
@@ -55,6 +57,15 @@ def test_public_catalog_query_contains_toilet_paper_product_line_quality_rules()
 def test_public_catalog_query_groups_paper_towel_into_roll_based_brand_rows():
     assert "kagit havlu" in PUBLIC_PRODUCT_CATALOG_QUERY
     assert "canonical_search_name LIKE '%kagit havlu'" in PUBLIC_PRODUCT_CATALOG_QUERY
+
+
+def test_public_catalog_query_groups_dishwashing_liquid_by_brand_variant_and_size():
+    assert "WHEN (" in PUBLIC_PRODUCT_CATALOG_QUERY
+    assert "THEN CONCAT_WS(" in PUBLIC_PRODUCT_CATALOG_QUERY
+    assert "'bulasik deterjani'" in PUBLIC_PRODUCT_CATALOG_QUERY
+    assert "WHEN standardized_product_name ILIKE '%elma%' THEN 'elma'" in PUBLIC_PRODUCT_CATALOG_QUERY
+    assert "canonical_search_name LIKE '%bulasik deterjani'" in PUBLIC_PRODUCT_CATALOG_QUERY
+    assert "|| ' l'" in PUBLIC_PRODUCT_CATALOG_QUERY
 
 
 def test_public_catalog_query_groups_eggs_by_count_and_onions_by_base_family():

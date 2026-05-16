@@ -20,4 +20,10 @@ MIGROS_CATEGORY_MAP = {
     "filter_coffee": "filtre-kahve-c-11223",
     "toilet_paper": "tuvalet-kagidi-c-49c",
     "paper_towel": "kagit-havlu-c-49d",
+    "dishwashing": "sivi-bulasik-deterjani-c-489",
+    "dishwasher_tablets": "bulasik-makinesi-tableti-c-28eb",
+    "laundry_detergent": "camasir-deterjani-c-486",
+    "bleach": "camasir-suyu-c-483",
+    "surface_cleaner": "sivi-yuzey-temizleyiciler-c-2912",
+    "kitchen_bath_cleaner": "mutfak-ve-banyo-temizleyiciler-c-491",
 }

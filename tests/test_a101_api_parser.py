@@ -171,3 +171,30 @@ def test_fetch_a101_category_api_resolves_kagit_havlu_nested_category(monkeypatc
         "products": [],
     }
     assert requested == [("C13", "kagit-urunleri")]
+
+
+def test_fetch_a101_category_api_resolves_temizlik_urunleri_nested_category(monkeypatch):
+    parent_tree = {
+        "id": "C11",
+        "name": "Temizlik Urunleri",
+        "children": [
+            {"id": "C1101", "name": "Camasir", "products": []},
+            {"id": "C1102", "name": "Bulasik", "products": []},
+            {"id": "C1103", "name": "Genel Temizlik", "products": []},
+        ],
+    }
+
+    requested = []
+
+    def fake_request(category_id: str, category_slug: str):
+        requested.append((category_id, category_slug))
+        return parent_tree
+
+    monkeypatch.setattr("scraper.a101.scraper._request_a101_category", fake_request)
+
+    assert fetch_a101_category_api("temizlik-urunleri/bulasik") == {
+        "id": "C1102",
+        "name": "Bulasik",
+        "products": [],
+    }
+    assert requested == [("C11", "temizlik-urunleri")]

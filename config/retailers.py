@@ -20,6 +20,12 @@ RETAILER_CONFIG = {
             "filter_coffee": "filtre-kahve-c-11223",
             "toilet_paper": "tuvalet-kagidi-c-49c",
             "paper_towel": "kagit-havlu-c-49d",
+            "dishwashing": "sivi-bulasik-deterjani-c-489",
+            "dishwasher_tablets": "bulasik-makinesi-tableti-c-28eb",
+            "laundry_detergent": "camasir-deterjani-c-486",
+            "bleach": "camasir-suyu-c-483",
+            "surface_cleaner": "sivi-yuzey-temizleyiciler-c-2912",
+            "kitchen_bath_cleaner": "mutfak-ve-banyo-temizleyiciler-c-491",
         },
     },
 
@@ -40,6 +46,11 @@ RETAILER_CONFIG = {
             "coffee": "su-icecek/kahve",
             "toilet_paper": "kagit-urunleri/tuvalet-kagidi",
             "paper_towel": "kagit-urunleri/kagit-havlu",
+            "dishwashing": "temizlik-urunleri/bulasik",
+            "dishwasher_tablets": "temizlik-urunleri/bulasik",
+            "laundry_detergent": "temizlik-urunleri/camasir",
+            "bleach": "temizlik-urunleri/genel-temizlik",
+            "surface_cleaner": "temizlik-urunleri/genel-temizlik",
         },
     }
 }

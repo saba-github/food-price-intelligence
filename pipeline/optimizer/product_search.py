@@ -3,6 +3,16 @@ import re
 
 import pandas as pd
 
+from pipeline.optimizer.cleaning_products import (
+    analyze_cleaning_pair,
+    cleaning_brand_from_query_tokens,
+    cleaning_variant_from_query_tokens,
+    explicit_cleaning_query_subtype,
+    extract_cleaning_bundle_signature,
+    infer_cleaning_product_profile,
+    is_cleaning_context_text,
+    preferred_cleaning_subtypes,
+)
 from pipeline.transforms import (
     infer_paper_product_profile,
     normalize_text,
@@ -15,6 +25,8 @@ PRODUCT_SEARCH_SYNONYMS = {
     "cucumber": ["hiyar"],
     "kahve": ["kahvesi"],
     "kahvesi": ["kahve"],
+    "bulasik tablet": ["bulasik tableti"],
+    "bulasik tableti": ["bulasik tablet"],
     "kagit havlu": ["havlu kagit", "havlu kagidi"],
     "havlu kagit": ["kagit havlu", "havlu kagidi"],
     "havlu kagidi": ["kagit havlu", "havlu kagit"],
@@ -149,6 +161,7 @@ PAPER_QUERY_GENERIC_TOKENS = {
     "li",
     "lu",
 }
+PRODUCE_FAMILY_IDS = {"salatalik", "muz", "elma"}
 
 FUZZY_MATCH_THRESHOLD = 0.78
 FUZZY_SYNONYM_THRESHOLD = 0.84
@@ -312,7 +325,23 @@ STRICT_SINGLE_TOKEN_QUERY_RULES = {
     },
     "su": {
         "allowed_tokens": {"su", "suyu"},
-        "exclude_tokens": {"sut", "yogurt", "susam", "sos"},
+        "exclude_tokens": {
+            "sut",
+            "yogurt",
+            "susam",
+            "sos",
+            "maden",
+            "meyve",
+            "kola",
+            "gazoz",
+            "soda",
+            "enerji",
+            "icecek",
+            "icecegi",
+            "limonata",
+            "tonik",
+            "aromali",
+        },
     },
     "yag": {
         "required_any_token_sets": [
@@ -353,6 +382,10 @@ STRICT_SINGLE_TOKEN_QUERY_RULES = {
     },
     "kola": {
         "allowed_tokens": {"kola"},
+        "exclude_tokens": set(),
+    },
+    "omo": {
+        "allowed_tokens": {"omo"},
         "exclude_tokens": set(),
     },
 }
@@ -486,6 +519,11 @@ def _match_product(product_name_or_row, exact_query: str, variants: list[str]):
         if value
     }
     query_tokens = _query_token_set(exact_query, variants)
+    candidate_profiles = [
+        infer_cleaning_product_profile(value)
+        for value in candidate_values
+        if value
+    ]
     if _query_mentions_towel(query_tokens) and _is_water_candidate(candidate_values):
         return None
 
@@ -494,6 +532,66 @@ def _match_product(product_name_or_row, exact_query: str, variants: list[str]):
         product_family_id = get_product_family_id(product_name)
         if product_family_id != explicit_subtype_family:
             return None
+
+    cleaning_brand_query = cleaning_brand_from_query_tokens(query_tokens)
+    if cleaning_brand_query:
+        if not any(
+            profile.get("brand_token") == cleaning_brand_query
+            for profile in candidate_profiles
+        ):
+            return None
+
+    explicit_cleaning_subtype = explicit_cleaning_query_subtype(query_tokens)
+    if explicit_cleaning_subtype:
+        candidate_subtypes = {
+            profile.get("subtype")
+            for profile in candidate_profiles
+            if profile.get("subtype")
+        }
+        if candidate_subtypes and explicit_cleaning_subtype not in candidate_subtypes:
+            return None
+        if not candidate_subtypes and any(
+            profile.get("is_cleaning") for profile in candidate_profiles
+        ):
+            return None
+
+    explicit_cleaning_variant = cleaning_variant_from_query_tokens(query_tokens)
+    if explicit_cleaning_variant:
+        relevant_profiles = [
+            profile
+            for profile in candidate_profiles
+            if profile.get("is_cleaning")
+            and (
+                not cleaning_brand_query
+                or profile.get("brand_token") == cleaning_brand_query
+            )
+            and (
+                not explicit_cleaning_subtype
+                or profile.get("subtype") == explicit_cleaning_subtype
+            )
+        ]
+        if relevant_profiles:
+            if any(
+                profile.get("variant_token") != explicit_cleaning_variant
+                for profile in relevant_profiles
+            ):
+                return None
+
+    size_matched_cleaning_query = False
+    cleaning_query_volume = _explicit_cleaning_size_query_liters(
+        exact_query,
+        variants,
+        query_tokens,
+    )
+    if cleaning_query_volume is not None:
+        matched_volume = any(
+            _cleaning_volume_matches_query(value, cleaning_query_volume)
+            for value in candidate_values
+        )
+        if any(profile.get("is_cleaning") for profile in candidate_profiles):
+            if not matched_volume:
+                return None
+            size_matched_cleaning_query = True
 
     strict_query_token = _strict_single_token_query(exact_query, variants)
     if strict_query_token:
@@ -572,6 +670,9 @@ def _match_product(product_name_or_row, exact_query: str, variants: list[str]):
 
     if best_partial_ratio:
         return 2, best_partial_ratio
+
+    if size_matched_cleaning_query:
+        return 2, 0.97
 
     best_fuzzy_ratio = max(
         (
@@ -677,13 +778,26 @@ def _query_mentions_towel(query_tokens: set[str]) -> bool:
 
 
 def _is_water_candidate(candidate_values: list[str]) -> bool:
+    beverage_exclude_tokens = {
+        "maden",
+        "meyve",
+        "kola",
+        "gazoz",
+        "soda",
+        "enerji",
+        "icecek",
+        "icecegi",
+        "limonata",
+        "tonik",
+        "aromali",
+    }
     for value in candidate_values:
         tokens = _token_set(value)
+        if beverage_exclude_tokens & tokens:
+            continue
         if "su" in tokens or "suyu" in tokens:
             return True
         if {"kaynak", "suyu"}.issubset(tokens):
-            return True
-        if {"maden", "suyu"}.issubset(tokens):
             return True
     return False
 
@@ -693,6 +807,79 @@ def _row_tokens(row: pd.Series) -> set[str]:
     for value in _row_text_values(row):
         tokens.update(_token_set(value))
     return tokens
+
+
+def _row_cleaning_profiles(row: pd.Series) -> list[dict[str, object]]:
+    profiles = []
+    for value in _row_text_values(row):
+        profile = infer_cleaning_product_profile(value)
+        if profile.get("is_cleaning"):
+            profiles.append(profile)
+    return profiles
+
+
+def _row_cleaning_subtypes(row: pd.Series) -> set[str]:
+    return {
+        str(profile["subtype"])
+        for profile in _row_cleaning_profiles(row)
+        if profile.get("subtype")
+    }
+
+
+def _row_cleaning_package_formats(row: pd.Series) -> set[str]:
+    return {
+        str(profile["package_format"])
+        for profile in _row_cleaning_profiles(row)
+        if profile.get("package_format")
+    }
+
+
+def _row_cleaning_bundle_signatures(row: pd.Series) -> set[str]:
+    return {
+        str(profile["bundle_signature"])
+        for profile in _row_cleaning_profiles(row)
+        if profile.get("bundle_signature")
+    }
+
+
+def _effective_coverage_status(row: pd.Series) -> str:
+    coverage_status = row.get("coverage_status")
+
+    pair_info = analyze_cleaning_pair(
+        row.get("a101_source_product_name"),
+        row.get("migros_source_product_name"),
+        row.get("a101_normalized_unit"),
+        row.get("migros_normalized_unit"),
+        row.get("a101_normalized_quantity"),
+        row.get("migros_normalized_quantity"),
+    )
+    if not pair_info.get("is_cleaning_pair"):
+        return coverage_status
+
+    if pair_info.get("soft_equivalent"):
+        return "comparable"
+
+    if coverage_status != "comparable":
+        return coverage_status
+
+    if not pair_info.get("same_brand") or not pair_info.get("same_subtype"):
+        return "comparison_review_required"
+
+    if (
+        pair_info.get("a101_variant_token")
+        and pair_info.get("migros_variant_token")
+        and not pair_info.get("same_variant")
+    ):
+        return "comparison_review_required"
+
+    if (
+        pair_info.get("a101_package_format")
+        and pair_info.get("migros_package_format")
+        and not pair_info.get("same_package_format")
+    ):
+        return "comparison_review_required"
+
+    return coverage_status
 
 
 def _is_cola_query(query_tokens: set[str]) -> bool:
@@ -722,6 +909,49 @@ def _extract_liter_value(value: str) -> float | None:
         return float(match_liter.group(1).replace(",", "."))
 
     return None
+
+
+def _explicit_cleaning_size_query_liters(
+    exact_query: str,
+    variants: list[str],
+    query_tokens: set[str],
+) -> float | None:
+    if _explicit_cleaning_bundle_signature(exact_query, variants):
+        return None
+
+    cleaning_brand_query = cleaning_brand_from_query_tokens(query_tokens)
+    cleaning_context_query = bool(
+        cleaning_brand_query
+        or explicit_cleaning_query_subtype(query_tokens)
+        or {"bulasik", "camasir", "deterjan", "deterjani"} & query_tokens
+    )
+    if not cleaning_context_query:
+        return None
+
+    query_values = [exact_query, *variants]
+    for value in query_values:
+        volume = _extract_liter_value(value)
+        if volume is not None:
+            return volume
+
+    numeric_tokens = [
+        int(token)
+        for token in query_tokens
+        if token.isdigit() and 100 <= int(token) <= 5000
+    ]
+    if len(numeric_tokens) != 1:
+        return None
+
+    return numeric_tokens[0] / 1000.0
+
+
+def _cleaning_volume_matches_query(value: str, query_volume_liters: float) -> bool:
+    candidate_volume = _extract_liter_value(value)
+    if candidate_volume is None:
+        return False
+
+    tolerance = 0.1 if query_volume_liters >= 1 else 0.03
+    return abs(candidate_volume - query_volume_liters) <= tolerance
 
 
 def _extract_piece_count(value: str) -> float | None:
@@ -1206,6 +1436,176 @@ def _generic_query_preference_rank(
     return 0
 
 
+def _cleaning_query_preference_rank(
+    row: pd.Series,
+    exact_query: str,
+    variants: list[str],
+) -> int:
+    query_tokens = _query_token_set(exact_query, variants)
+    subtype_order = preferred_cleaning_subtypes(query_tokens)
+    if not subtype_order:
+        return 0
+
+    row_subtypes = _row_cleaning_subtypes(row)
+    if not row_subtypes:
+        return len(subtype_order) + 3
+
+    for index, subtype in enumerate(subtype_order):
+        if subtype in row_subtypes:
+            return index
+
+    return len(subtype_order) + 1
+
+
+def _cleaning_brand_coverage_rank(
+    row: pd.Series,
+    exact_query: str,
+    variants: list[str],
+    coverage_rank: int,
+) -> int:
+    query_tokens = _query_token_set(exact_query, variants)
+    brand_query = cleaning_brand_from_query_tokens(query_tokens)
+    if not brand_query:
+        return 0
+
+    row_profiles = _row_cleaning_profiles(row)
+    if not row_profiles:
+        return 0
+
+    if not any(profile.get("brand_token") == brand_query for profile in row_profiles):
+        return 0
+
+    return coverage_rank
+
+
+def _explicit_cleaning_bundle_signature(
+    exact_query: str,
+    variants: list[str],
+) -> str | None:
+    for value in [exact_query, *variants]:
+        signature = extract_cleaning_bundle_signature(value)
+        if signature:
+            return signature
+    return None
+
+
+def _cleaning_package_rank(
+    row: pd.Series,
+    exact_query: str,
+    variants: list[str],
+) -> int:
+    query_tokens = _query_token_set(exact_query, variants)
+    preferred_subtypes = preferred_cleaning_subtypes(query_tokens)
+    if not preferred_subtypes:
+        return 0
+
+    row_subtypes = _row_cleaning_subtypes(row)
+    if not row_subtypes:
+        return 0
+
+    primary_subtype = preferred_subtypes[0]
+    if primary_subtype not in row_subtypes:
+        return 0
+
+    row_formats = _row_cleaning_package_formats(row)
+    explicit_bundle_signature = _explicit_cleaning_bundle_signature(
+        exact_query,
+        variants,
+    )
+    if explicit_bundle_signature:
+        row_bundle_signatures = _row_cleaning_bundle_signatures(row)
+        return 0 if explicit_bundle_signature in row_bundle_signatures else 1
+
+    if "sprey" in query_tokens:
+        return 0 if "spray" in row_formats else 1
+
+    if primary_subtype == "dishwashing_liquid":
+        if "spray" in row_formats:
+            return 2
+        if "multipack_bundle" in row_formats:
+            return 1
+        if "standard_single_pack" in row_formats:
+            return 0
+
+    return 0
+
+
+def _cleaning_variant_rank(
+    row: pd.Series,
+    exact_query: str,
+    variants: list[str],
+) -> int:
+    query_tokens = _query_token_set(exact_query, variants)
+    brand_query = cleaning_brand_from_query_tokens(query_tokens)
+    if brand_query not in {"fairy", "pril"}:
+        return 0
+
+    if len(query_tokens - {brand_query}) > 0:
+        return 0
+
+    row_subtypes = _row_cleaning_subtypes(row)
+    if "dishwashing_liquid" not in row_subtypes:
+        return 0
+
+    row_tokens = _row_tokens(row)
+    scent_tokens = {
+        "elma",
+        "limon",
+        "portakal",
+        "nar",
+        "bergamot",
+        "lavanta",
+        "yasemin",
+        "okyanus",
+    }
+    has_scent_token = bool(scent_tokens & row_tokens)
+    has_sivi_token = bool({"sivi"} & row_tokens)
+
+    if has_sivi_token and not has_scent_token:
+        return 0
+    if not has_scent_token:
+        return 1
+    if has_sivi_token:
+        return 2
+    return 3
+
+
+def _cleaning_context_rank(
+    row: pd.Series,
+    exact_query: str,
+    variants: list[str],
+) -> int:
+    query_tokens = _query_token_set(exact_query, variants)
+    subtype_order = preferred_cleaning_subtypes(query_tokens)
+    if not subtype_order:
+        return 0
+
+    primary_subtype = subtype_order[0]
+    row_subtypes = _row_cleaning_subtypes(row)
+    if primary_subtype not in row_subtypes:
+        return 0
+
+    row_tokens = _row_tokens(row)
+    required_tokens_by_subtype = {
+        "dishwashing_liquid": ({"bulasik"}, {"deterjan", "deterjani"}),
+        "dishwasher_tablet": ({"tablet", "tableti", "kapsul", "kapsulu", "pods"},),
+        "dishwasher_salt": ({"tuz", "tuzu"}, {"bulasik", "makinesi", "makine"}),
+        "rinse_aid": ({"parlatici", "parlaticisi"},),
+        "dishwasher_cleaner": ({"temizleyici"}, {"bulasik", "makinesi", "makine"}),
+        "laundry_liquid": ({"camasir"}, {"deterjan", "deterjani"}, {"sivi", "jel"}),
+        "laundry_powder": ({"camasir"}, {"deterjan", "deterjani"}, {"toz"}),
+        "laundry_capsule": ({"camasir"}, {"kapsul", "kapsulu", "pods"}),
+        "bleach": ({"camasir"}, {"suyu"}),
+        "surface_cleaner": ({"yuzey", "temizleyici"},),
+    }
+
+    required_groups = required_tokens_by_subtype.get(primary_subtype)
+    if not required_groups:
+        return 0
+
+    return 0 if all(group & row_tokens for group in required_groups) else 1
+
+
 def _should_suppress_generic_variant(
     product_name: str,
     exact_query: str,
@@ -1275,13 +1675,19 @@ def search_product_catalog(
 
         match_rank, match_score = match
         source_count = int(row.get("source_count") or 0)
-        coverage_status = row.get("coverage_status")
+        coverage_status = _effective_coverage_status(row)
         if coverage_status == "comparable":
             coverage_rank = 0
         elif coverage_status == "comparison_review_required":
             coverage_rank = 2
         else:
             coverage_rank = 1 if source_count > 1 else 2
+        cleaning_brand_coverage_rank = _cleaning_brand_coverage_rank(
+            row,
+            exact_query,
+            variants,
+            coverage_rank,
+        )
         query_penalty = _generic_query_penalty(row, exact_query, variants)
         cola_penalty = _cola_row_penalty(row, exact_query, variants)
         cola_package_rank = _cola_package_rank(row, exact_query, variants)
@@ -1291,6 +1697,11 @@ def search_product_catalog(
                 _paper_roll_selection_rank(row, exact_query, variants),
                 _paper_brand_selection_rank(row, exact_query, variants),
                 _paper_brand_pair_rank(row, exact_query, variants),
+                _cleaning_query_preference_rank(row, exact_query, variants),
+                cleaning_brand_coverage_rank,
+                _cleaning_variant_rank(row, exact_query, variants),
+                _cleaning_package_rank(row, exact_query, variants),
+                _cleaning_context_rank(row, exact_query, variants),
                 match_rank,
                 _generic_query_primary_rank(row, exact_query, variants),
                 query_penalty + cola_penalty,
@@ -1321,12 +1732,10 @@ def split_search_results_by_safety(
     if search_results.empty:
         return search_results.copy(), search_results.copy()
 
-    safe_results = search_results[
-        search_results["coverage_status"].isin(SAFE_SEARCH_COVERAGE_STATUSES)
-    ].reset_index(drop=True)
-    related_results = search_results[
-        ~search_results["coverage_status"].isin(SAFE_SEARCH_COVERAGE_STATUSES)
-    ].reset_index(drop=True)
+    effective_statuses = search_results.apply(_effective_coverage_status, axis=1)
+    safe_mask = effective_statuses.isin(SAFE_SEARCH_COVERAGE_STATUSES)
+    safe_results = search_results[safe_mask].reset_index(drop=True)
+    related_results = search_results[~safe_mask].reset_index(drop=True)
     return safe_results, related_results
 
 
@@ -1377,6 +1786,8 @@ def build_search_group_sections(
 
 def get_product_family_id(product_name: str) -> str | None:
     for family_id in PRODUCT_FAMILY_DEFINITIONS:
+        if family_id in PRODUCE_FAMILY_IDS and is_cleaning_context_text(product_name):
+            continue
         if any(
             _term_matches_product(product_name, term)
             for term in _family_terms(family_id)

@@ -1,5 +1,10 @@
 from decimal import Decimal
 
+from pipeline.optimizer.cleaning_products import (
+    analyze_cleaning_pair,
+    infer_cleaning_product_profile,
+    synthesize_cleaning_price_rows,
+)
 from pipeline.optimizer.measurement import add_measurement_labels
 from pipeline.optimizer.paper_products import synthesize_paper_towel_price_rows
 from pipeline.transforms import infer_paper_product_profile, normalize_text
@@ -190,6 +195,79 @@ def _apply_toilet_paper_comparison_rules(price_row: dict) -> dict:
     return updated_row
 
 
+def _apply_cleaning_comparison_rules(price_row: dict) -> dict:
+    if not (
+        price_row.get("a101_price") is not None
+        and price_row.get("migros_price") is not None
+    ):
+        return price_row
+
+    pair_info = analyze_cleaning_pair(
+        price_row.get("a101_source_product_name"),
+        price_row.get("migros_source_product_name"),
+        price_row.get("a101_normalized_unit"),
+        price_row.get("migros_normalized_unit"),
+        price_row.get("a101_normalized_quantity"),
+        price_row.get("migros_normalized_quantity"),
+    )
+    if not pair_info.get("is_cleaning_pair"):
+        return price_row
+
+    updated_row = dict(price_row)
+    if pair_info.get("soft_equivalent"):
+        updated_row["soft_equivalent_match"] = True
+        updated_row["comparison_confidence"] = SAFE_COMPARISON_CONFIDENCE
+        updated_row["comparison_review_reason"] = None
+        updated_row["coverage_status"] = COMPARABLE_STATUS
+        return updated_row
+
+    if not (
+        price_row.get("same_unit_flag") is True
+        and price_row.get("same_quantity_flag") is True
+    ):
+        return price_row
+
+    if not pair_info.get("same_brand"):
+        updated_row["comparison_confidence"] = "low"
+        updated_row["comparison_review_reason"] = "brand_mismatch"
+        updated_row["coverage_status"] = COMPARISON_REVIEW_STATUS
+        return updated_row
+
+    if not pair_info.get("same_subtype"):
+        updated_row["comparison_confidence"] = "medium"
+        if pair_info.get("a101_subtype") and pair_info.get("migros_subtype"):
+            updated_row["comparison_review_reason"] = "subtype_mismatch"
+        else:
+            updated_row["comparison_review_reason"] = "subtype_unknown"
+        updated_row["coverage_status"] = COMPARISON_REVIEW_STATUS
+        return updated_row
+
+    if (
+        pair_info.get("a101_variant_token")
+        and pair_info.get("migros_variant_token")
+        and not pair_info.get("same_variant")
+    ):
+        updated_row["comparison_confidence"] = "medium"
+        updated_row["comparison_review_reason"] = "variant_mismatch"
+        updated_row["coverage_status"] = COMPARISON_REVIEW_STATUS
+        return updated_row
+
+    if (
+        pair_info.get("a101_package_format")
+        and pair_info.get("migros_package_format")
+        and not pair_info.get("same_package_format")
+    ):
+        updated_row["comparison_confidence"] = "medium"
+        updated_row["comparison_review_reason"] = "package_format_mismatch"
+        updated_row["coverage_status"] = COMPARISON_REVIEW_STATUS
+        return updated_row
+
+    updated_row["comparison_confidence"] = SAFE_COMPARISON_CONFIDENCE
+    updated_row["comparison_review_reason"] = None
+    updated_row["coverage_status"] = COMPARABLE_STATUS
+    return updated_row
+
+
 def get_selected_price(price_info: dict) -> int | float | None:
     selected_price = price_info.get("price_per_unit")
 
@@ -204,6 +282,19 @@ def _needs_paper_towel_supplement(standardized_products: list[str]) -> bool:
         infer_paper_product_profile(product_name).get("kind") == "paper_towel"
         for product_name in standardized_products
     )
+
+
+def _cleaning_supplement_brands(standardized_products: list[str]) -> set[str]:
+    return {
+        str(profile.get("brand_token"))
+        for product_name in standardized_products
+        for profile in [infer_cleaning_product_profile(product_name)]
+        if profile.get("is_cleaning") and profile.get("brand_token")
+    }
+
+
+def _needs_cleaning_supplement(standardized_products: list[str]) -> bool:
+    return bool(_cleaning_supplement_brands(standardized_products))
 
 
 def _build_single_source_price_row(
@@ -230,6 +321,53 @@ def _build_single_source_price_row(
         "a101_normalized_quantity": normalized_quantity if source_name == "a101" else None,
         "migros_normalized_quantity": normalized_quantity if source_name == "migros" else None,
     }
+
+
+def _get_cleaning_source_rows(cursor, brand_tokens: set[str]) -> list[dict]:
+    if not brand_tokens:
+        return []
+
+    like_patterns = [f"%{brand_token}%" for brand_token in sorted(brand_tokens)]
+    cursor.execute(
+        """
+        WITH latest_source AS (
+            SELECT
+                source_name,
+                source_product_name,
+                price,
+                normalized_unit,
+                normalized_quantity,
+                ROW_NUMBER() OVER (
+                    PARTITION BY source_name, source_product_name
+                    ORDER BY observed_at DESC, price_observation_id DESC
+                ) AS source_rn
+            FROM price_history
+            WHERE price IS NOT NULL
+              AND LOWER(source_product_name) LIKE ANY(%s)
+        )
+        SELECT
+            source_name,
+            source_product_name,
+            price,
+            normalized_unit,
+            normalized_quantity
+        FROM latest_source
+        WHERE source_rn = 1
+        """,
+        (like_patterns,),
+    )
+
+    rows = cursor.fetchall()
+    return [
+        _build_single_source_price_row(
+            row[0],
+            row[1],
+            row[2],
+            row[3],
+            row[4],
+        )
+        for row in rows
+    ]
 
 
 def _get_paper_towel_source_rows(cursor) -> list[dict]:
@@ -310,7 +448,8 @@ def get_cross_compare_prices(cursor, standardized_products: list[str]) -> list[d
     rows = cursor.fetchall()
     latest_rows = [
         add_measurement_labels(
-            _apply_toilet_paper_comparison_rules(
+            _apply_cleaning_comparison_rules(
+                _apply_toilet_paper_comparison_rules(
                 {
                     "standardized_product_name": row[0],
                     "canonical_name": row[1],
@@ -328,6 +467,7 @@ def get_cross_compare_prices(cursor, standardized_products: list[str]) -> list[d
                     "a101_normalized_quantity": row[13],
                     "migros_normalized_quantity": row[14],
                 }
+                )
             )
         )
         for row in rows
@@ -373,6 +513,10 @@ def get_latest_price_history_prices(cursor, standardized_products: list[str]) ->
                         AND standardized_product_name NOT ILIKE '%%soda%%'
                         AND standardized_product_name NOT ILIKE '%%gazli%%'
                         AND standardized_product_name NOT ILIKE '%%aromali%%'
+                        AND NOT (
+                            standardized_product_name ILIKE '%%camasir%%'
+                            AND standardized_product_name ILIKE '%%suyu%%'
+                        )
                         AND standardized_product_name NOT ILIKE '%%12x%%'
                         AND standardized_product_name NOT ILIKE '%%6x%%'
                         AND standardized_product_name NOT ILIKE '%%4x%%'
@@ -459,6 +603,66 @@ def get_latest_price_history_prices(cursor, standardized_products: list[str]) ->
                         AND standardized_product_name ILIKE '%%yag%%'
                     )
                     THEN 'findik yagi'
+                    WHEN (
+                        (
+                            standardized_product_name ILIKE '%%bulasik%%'
+                            AND (
+                                standardized_product_name ILIKE '%%deterjan%%'
+                                OR standardized_product_name ILIKE '%%deterjani%%'
+                                OR standardized_product_name ILIKE '%%elde%%'
+                                OR standardized_product_name ILIKE '%%yikama%%'
+                                OR standardized_product_name ILIKE '%%sivi%%'
+                            )
+                            AND standardized_product_name NOT ILIKE '%%makine%%'
+                            AND standardized_product_name NOT ILIKE '%%makinesi%%'
+                            AND standardized_product_name NOT ILIKE '%%tablet%%'
+                            AND standardized_product_name NOT ILIKE '%%tableti%%'
+                            AND standardized_product_name NOT ILIKE '%%kapsul%%'
+                            AND standardized_product_name NOT ILIKE '%%parlatici%%'
+                            AND standardized_product_name NOT ILIKE '%%temizleyici%%'
+                            AND standardized_product_name NOT ILIKE '%%tuz%%'
+                            AND standardized_product_name NOT ILIKE '%%sprey%%'
+                        )
+                        OR (
+                            standardized_product_name ILIKE '%%fairy%%'
+                            AND (
+                                standardized_product_name ILIKE '%%elma%%'
+                                OR standardized_product_name ILIKE '%%limon%%'
+                                OR standardized_product_name ILIKE '%%aloe%%'
+                                OR standardized_product_name ILIKE '%%portakal%%'
+                                OR standardized_product_name ILIKE '%%sensitive%%'
+                                OR standardized_product_name ILIKE '%%elde%%'
+                                OR standardized_product_name ILIKE '%%yikama%%'
+                            )
+                            AND standardized_product_name NOT ILIKE '%%tablet%%'
+                            AND standardized_product_name NOT ILIKE '%%tableti%%'
+                            AND standardized_product_name NOT ILIKE '%%kapsul%%'
+                            AND standardized_product_name NOT ILIKE '%%parlatici%%'
+                            AND standardized_product_name NOT ILIKE '%%temizleyici%%'
+                            AND standardized_product_name NOT ILIKE '%%tuz%%'
+                            AND standardized_product_name NOT ILIKE '%%sprey%%'
+                        )
+                    )
+                    THEN CONCAT_WS(
+                        ' ',
+                        CASE
+                            WHEN standardized_product_name ILIKE '%%fairy%%' THEN 'fairy'
+                            WHEN standardized_product_name ILIKE '%%pril%%' THEN 'pril'
+                            WHEN standardized_product_name ILIKE '%%bingo%%' THEN 'bingo'
+                            WHEN standardized_product_name ILIKE '%%asperox%%' THEN 'asperox'
+                            ELSE NULLIF(TRIM(LOWER(SPLIT_PART(standardized_product_name, ' ', 1))), '')
+                        END,
+                        CASE
+                            WHEN standardized_product_name ILIKE '%%elma%%' THEN 'elma'
+                            WHEN standardized_product_name ILIKE '%%limon%%' THEN 'limon'
+                            WHEN standardized_product_name ILIKE '%%aloe%%' THEN 'aloe'
+                            WHEN standardized_product_name ILIKE '%%portakal%%' THEN 'portakal'
+                            WHEN standardized_product_name ILIKE '%%sensitive%%' THEN 'sensitive'
+                            WHEN standardized_product_name ILIKE '%%platinum%%' THEN 'platinum'
+                            ELSE NULL
+                        END,
+                        'bulasik deterjani'
+                    )
                     WHEN (
                         standardized_product_name ILIKE '%%tuvalet%%'
                         AND standardized_product_name ILIKE '%%kagid%%'
@@ -707,6 +911,12 @@ def get_latest_price_history_prices(cursor, standardized_products: list[str]) ->
                      AND grouping_quantity IS NOT NULL
                      AND canonical_search_name LIKE '%%kagit havlu'
                     THEN canonical_search_name || ' ' || grouping_quantity::int::text || ' roll'
+                    WHEN grouping_unit = 'liter'
+                     AND grouping_quantity IS NOT NULL
+                     AND canonical_search_name LIKE '%%bulasik deterjani'
+                    THEN
+                        canonical_search_name || ' ' ||
+                        REGEXP_REPLACE(grouping_quantity::text, '\.?0+$', '') || ' l'
                     WHEN canonical_search_name IN (
                         'su',
                         'tuz',
@@ -874,6 +1084,13 @@ def get_latest_price_history_prices(cursor, standardized_products: list[str]) ->
         )
         for row in rows
     ]
+    if _needs_cleaning_supplement(standardized_products):
+        latest_rows.extend(
+            _get_cleaning_source_rows(
+                cursor,
+                _cleaning_supplement_brands(standardized_products),
+            )
+        )
     if _needs_paper_towel_supplement(standardized_products):
         latest_rows.extend(_get_paper_towel_source_rows(cursor))
 
@@ -910,6 +1127,7 @@ def build_price_rows_with_partial_coverage(
 
     augmented_latest_rows = [
         *latest_price_rows,
+        *synthesize_cleaning_price_rows(latest_price_rows),
         *synthesize_paper_towel_price_rows(latest_price_rows),
     ]
 
@@ -985,7 +1203,10 @@ def is_high_confidence_comparison(price_row: dict) -> bool:
         price_row.get("a101_price") is not None
         and price_row.get("migros_price") is not None
         and price_row.get("same_unit_flag") is True
-        and price_row.get("same_quantity_flag") is True
+        and (
+            price_row.get("same_quantity_flag") is True
+            or price_row.get("soft_equivalent_match") is True
+        )
         and price_row.get("comparison_confidence") == SAFE_COMPARISON_CONFIDENCE
     )
 

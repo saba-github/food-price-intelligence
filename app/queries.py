@@ -390,6 +390,10 @@ WITH latest_source_base AS (
                 AND standardized_product_name NOT ILIKE '%soda%'
                 AND standardized_product_name NOT ILIKE '%gazli%'
                 AND standardized_product_name NOT ILIKE '%aromali%'
+                AND NOT (
+                    standardized_product_name ILIKE '%camasir%'
+                    AND standardized_product_name ILIKE '%suyu%'
+                )
                 AND standardized_product_name NOT ILIKE '%12x%'
                 AND standardized_product_name NOT ILIKE '%6x%'
                 AND standardized_product_name NOT ILIKE '%4x%'
@@ -476,6 +480,66 @@ WITH latest_source_base AS (
                 AND standardized_product_name ILIKE '%yag%'
             )
             THEN 'findik yagi'
+            WHEN (
+                (
+                    standardized_product_name ILIKE '%bulasik%'
+                    AND (
+                        standardized_product_name ILIKE '%deterjan%'
+                        OR standardized_product_name ILIKE '%deterjani%'
+                        OR standardized_product_name ILIKE '%elde%'
+                        OR standardized_product_name ILIKE '%yikama%'
+                        OR standardized_product_name ILIKE '%sivi%'
+                    )
+                    AND standardized_product_name NOT ILIKE '%makine%'
+                    AND standardized_product_name NOT ILIKE '%makinesi%'
+                    AND standardized_product_name NOT ILIKE '%tablet%'
+                    AND standardized_product_name NOT ILIKE '%tableti%'
+                    AND standardized_product_name NOT ILIKE '%kapsul%'
+                    AND standardized_product_name NOT ILIKE '%parlatici%'
+                    AND standardized_product_name NOT ILIKE '%temizleyici%'
+                    AND standardized_product_name NOT ILIKE '%tuz%'
+                    AND standardized_product_name NOT ILIKE '%sprey%'
+                )
+                OR (
+                    standardized_product_name ILIKE '%fairy%'
+                    AND (
+                        standardized_product_name ILIKE '%elma%'
+                        OR standardized_product_name ILIKE '%limon%'
+                        OR standardized_product_name ILIKE '%aloe%'
+                        OR standardized_product_name ILIKE '%portakal%'
+                        OR standardized_product_name ILIKE '%sensitive%'
+                        OR standardized_product_name ILIKE '%elde%'
+                        OR standardized_product_name ILIKE '%yikama%'
+                    )
+                    AND standardized_product_name NOT ILIKE '%tablet%'
+                    AND standardized_product_name NOT ILIKE '%tableti%'
+                    AND standardized_product_name NOT ILIKE '%kapsul%'
+                    AND standardized_product_name NOT ILIKE '%parlatici%'
+                    AND standardized_product_name NOT ILIKE '%temizleyici%'
+                    AND standardized_product_name NOT ILIKE '%tuz%'
+                    AND standardized_product_name NOT ILIKE '%sprey%'
+                )
+            )
+            THEN CONCAT_WS(
+                ' ',
+                CASE
+                    WHEN standardized_product_name ILIKE '%fairy%' THEN 'fairy'
+                    WHEN standardized_product_name ILIKE '%pril%' THEN 'pril'
+                    WHEN standardized_product_name ILIKE '%bingo%' THEN 'bingo'
+                    WHEN standardized_product_name ILIKE '%asperox%' THEN 'asperox'
+                    ELSE NULLIF(TRIM(LOWER(SPLIT_PART(standardized_product_name, ' ', 1))), '')
+                END,
+                CASE
+                    WHEN standardized_product_name ILIKE '%elma%' THEN 'elma'
+                    WHEN standardized_product_name ILIKE '%limon%' THEN 'limon'
+                    WHEN standardized_product_name ILIKE '%aloe%' THEN 'aloe'
+                    WHEN standardized_product_name ILIKE '%portakal%' THEN 'portakal'
+                    WHEN standardized_product_name ILIKE '%sensitive%' THEN 'sensitive'
+                    WHEN standardized_product_name ILIKE '%platinum%' THEN 'platinum'
+                    ELSE NULL
+                END,
+                'bulasik deterjani'
+            )
             WHEN (
                 standardized_product_name ILIKE '%tuvalet%'
                 AND standardized_product_name ILIKE '%kagid%'
@@ -730,6 +794,12 @@ latest_group_keys AS (
              AND grouping_quantity IS NOT NULL
              AND canonical_search_name LIKE '%kagit havlu'
             THEN canonical_search_name || ' ' || grouping_quantity::int::text || ' roll'
+            WHEN grouping_unit = 'liter'
+             AND grouping_quantity IS NOT NULL
+             AND canonical_search_name LIKE '%bulasik deterjani'
+            THEN
+                canonical_search_name || ' ' ||
+                REGEXP_REPLACE(grouping_quantity::text, '\.?0+$', '') || ' l'
             WHEN canonical_search_name IN (
                 'su',
                 'tuz',

@@ -79,6 +79,28 @@ class FakeCursor:
             if "mart_cross_compare" in sql
             else self.latest_price_rows
         )
+        if "LOWER(source_product_name) LIKE ANY" in sql:
+            patterns = self.requested_products or []
+            cleaned_patterns = [
+                str(pattern).strip("%").lower()
+                for pattern in patterns
+                if pattern
+            ]
+            self.current_rows = [
+                (
+                    row[8] and "a101" or row[9] and "migros",
+                    row[8] or row[9],
+                    row[2] if row[8] else row[3],
+                    row[10] if row[8] else row[11],
+                    row[12] if row[8] else row[13],
+                )
+                for row in source_rows
+                if (
+                    (row[8] and any(token in row[8].lower() for token in cleaned_patterns))
+                    or (row[9] and any(token in row[9].lower() for token in cleaned_patterns))
+                )
+            ]
+            return
         if self.requested_products:
             self.current_rows = [
                 row
@@ -967,6 +989,205 @@ def test_optimize_basket_downgrades_paper_towel_when_brand_differs():
 
     assert result["matched_products"][0]["coverage_status"] == "comparison_review_required"
     assert result["matched_products"][0]["comparison_review_reason"] == "brand_mismatch"
+
+
+def test_optimize_basket_keeps_same_brand_same_subtype_cleaner_comparable():
+    cursor = FakeCursor(
+        cross_compare_rows=[
+            cross_row(
+                "domestos ultra camasir suyu 750 ml",
+                Decimal("69.90"),
+                Decimal("74.95"),
+                "a101",
+                a101_unit="liter",
+                migros_unit="liter",
+                a101_quantity=0.75,
+                migros_quantity=0.75,
+                a101_source_product_name="Domestos Ultra Çamaşır Suyu 750 ml",
+                migros_source_product_name="Domestos Ultra Çamaşır Suyu 750 Ml",
+            )
+        ],
+        latest_price_rows=[],
+    )
+
+    result = optimize_basket(cursor, ["domestos ultra camasir suyu 750 ml"])
+
+    assert result["matched_products"][0]["coverage_status"] == "comparable"
+    assert result["matched_products"][0]["comparison_review_reason"] is None
+
+
+def test_optimize_basket_downgrades_cleaning_pair_when_subtypes_differ():
+    cursor = FakeCursor(
+        cross_compare_rows=[
+            cross_row(
+                "domestos 750 ml",
+                Decimal("69.90"),
+                Decimal("74.95"),
+                "a101",
+                a101_unit="liter",
+                migros_unit="liter",
+                a101_quantity=0.75,
+                migros_quantity=0.75,
+                a101_source_product_name="Domestos Ultra Çamaşır Suyu 750 ml",
+                migros_source_product_name="Domestos Banyo & Mutfak Köpük 750 Ml",
+            )
+        ],
+        latest_price_rows=[],
+    )
+
+    result = optimize_basket(cursor, ["domestos 750 ml"])
+
+    assert result["matched_products"][0]["coverage_status"] == "comparison_review_required"
+    assert result["matched_products"][0]["comparison_review_reason"] == "subtype_mismatch"
+
+
+def test_optimize_basket_keeps_same_brand_same_variant_cleaning_pair_comparable():
+    cursor = FakeCursor(
+        cross_compare_rows=[
+            cross_row(
+                "fairy elma bulasik deterjani 1.5 l",
+                Decimal("129.90"),
+                Decimal("149.95"),
+                "a101",
+                a101_unit="liter",
+                migros_unit="liter",
+                a101_quantity=Decimal("1.5"),
+                migros_quantity=Decimal("1.5"),
+                a101_source_product_name="Fairy Elma Bulaşık Deterjanı 1500 Ml",
+                migros_source_product_name="Fairy Temiz & Ferah Elma Kokulu Elde Yıkama 1.5 L",
+            )
+        ],
+        latest_price_rows=[],
+    )
+
+    result = optimize_basket(cursor, ["fairy elma bulasik deterjani 1.5 l"])
+
+    assert result["matched_products"][0]["coverage_status"] == "comparable"
+    assert result["matched_products"][0]["comparison_review_reason"] is None
+
+
+def test_optimize_basket_soft_equivalent_cleaning_pair_stays_comparable_with_close_liter_size():
+    cursor = FakeCursor(
+        cross_compare_rows=[
+            cross_row(
+                "fairy elma bulasik deterjani",
+                Decimal("129.90"),
+                Decimal("139.95"),
+                "a101",
+                same_unit=True,
+                same_quantity=False,
+                confidence="medium",
+                a101_unit="liter",
+                migros_unit="liter",
+                a101_quantity=Decimal("1.5"),
+                migros_quantity=Decimal("1.35"),
+                a101_source_product_name="Fairy Elma BulaÅŸÄ±k DeterjanÄ± 1500 Ml",
+                migros_source_product_name="Fairy Temiz & Ferah Elma Kokulu Elde YÄ±kama 1.35 L",
+            )
+        ],
+        latest_price_rows=[],
+    )
+
+    result = optimize_basket(cursor, ["fairy elma bulasik deterjani"])
+
+    assert result["matched_products"][0]["coverage_status"] == "comparable"
+    assert result["matched_products"][0]["comparison_review_reason"] is None
+
+
+def test_optimize_basket_synthesizes_fairy_650_cross_retailer_pair():
+    cursor = FakeCursor(
+        cross_compare_rows=[],
+        latest_price_rows=[
+            (
+                "fairy bulasik deterjani 0.65 l",
+                "fairy bulasik deterjani 0.65 l",
+                Decimal("54.90"),
+                None,
+                None,
+                False,
+                False,
+                "single_source",
+                "Fairy Sıvı Bulaşık Deterjanı 650 ml",
+                None,
+                "liter",
+                None,
+                Decimal("0.65"),
+                None,
+            ),
+            (
+                "fairy limon bulasik deterjani 0.65 l",
+                "fairy limon bulasik deterjani 0.65 l",
+                None,
+                Decimal("62.95"),
+                None,
+                False,
+                False,
+                "single_source",
+                None,
+                "Fairy Sıvı Bulaşık Deterjanı Limon 650 Ml",
+                None,
+                "liter",
+                None,
+                Decimal("0.65"),
+            ),
+        ],
+    )
+
+    result = optimize_basket(cursor, ["fairy bulasik deterjani 0.65 l"])
+
+    assert result["matched_products"][0]["coverage_status"] == "comparable"
+    assert result["matched_products"][0]["a101_source_product_name"] == "Fairy Sıvı Bulaşık Deterjanı 650 ml"
+    assert result["matched_products"][0]["migros_source_product_name"] == "Fairy Sıvı Bulaşık Deterjanı Limon 650 Ml"
+
+
+def test_optimize_basket_downgrades_cleaning_pair_when_variant_differs():
+    cursor = FakeCursor(
+        cross_compare_rows=[
+            cross_row(
+                "fairy bulasik deterjani 1.5 l",
+                Decimal("129.90"),
+                Decimal("149.95"),
+                "a101",
+                a101_unit="liter",
+                migros_unit="liter",
+                a101_quantity=Decimal("1.5"),
+                migros_quantity=Decimal("1.5"),
+                a101_source_product_name="Fairy Elma Bulaşık Deterjanı 1500 Ml",
+                migros_source_product_name="Fairy Limon Bulaşık Deterjanı 1.5 L",
+            )
+        ],
+        latest_price_rows=[],
+    )
+
+    result = optimize_basket(cursor, ["fairy bulasik deterjani 1.5 l"])
+
+    assert result["matched_products"][0]["coverage_status"] == "comparison_review_required"
+    assert result["matched_products"][0]["comparison_review_reason"] == "variant_mismatch"
+
+
+def test_optimize_basket_downgrades_cleaning_pair_when_package_format_differs():
+    cursor = FakeCursor(
+        cross_compare_rows=[
+            cross_row(
+                "fairy bulasik deterjani 500 ml",
+                Decimal("59.90"),
+                Decimal("64.95"),
+                "a101",
+                a101_unit="liter",
+                migros_unit="liter",
+                a101_quantity=Decimal("0.5"),
+                migros_quantity=Decimal("0.5"),
+                a101_source_product_name="Fairy Güçlü Sprey 500 Ml",
+                migros_source_product_name="Fairy Elma Bulaşık Deterjanı 500 Ml",
+            )
+        ],
+        latest_price_rows=[],
+    )
+
+    result = optimize_basket(cursor, ["fairy bulasik deterjani 500 ml"])
+
+    assert result["matched_products"][0]["coverage_status"] == "comparison_review_required"
+    assert result["matched_products"][0]["comparison_review_reason"] == "package_format_mismatch"
 
 
 def test_optimize_basket_prefers_latest_high_confidence_row_over_stale_cross_compare_status():

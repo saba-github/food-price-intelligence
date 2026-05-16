@@ -1445,6 +1445,21 @@ def test_search_su_0_5_l_still_returns_water():
     )
 
 
+def test_search_generic_su_excludes_other_beverages():
+    catalog_df = make_catalog(
+        [
+            ("su 0.5 l", 2, "a101, migros"),
+            ("kola coca-cola 1 l", 2, "a101, migros"),
+            ("meyve suyu 1 l", 1, "migros"),
+            ("maden suyu 0.2 l", 1, "migros"),
+            ("enerji icecegi 0.25 l", 1, "a101"),
+            ("gazoz 1 l", 1, "a101"),
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "su")) == ["su 0.5 l"]
+
+
 def test_search_kagit_havlu_still_returns_paper_towel_and_not_water():
     catalog_df = make_catalog(
         [
@@ -1531,3 +1546,756 @@ def test_search_generic_kola_does_not_match_cikolatali_sos():
     assert product_names(search_product_catalog(catalog_df, "kola")) == [
         "cola turka kola"
     ]
+
+
+def test_search_omo_does_not_match_homojenize():
+    catalog_df = make_catalog(
+        [
+            ("omo active fresh", 1, "migros"),
+            ("sut homojenize", 1, "a101"),
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "omo")) == [
+        "omo active fresh"
+    ]
+
+
+def test_search_fairy_does_not_collapse_related_group_to_elma_family():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "bulasik deterjani elma fairy",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Elma Bulaşık Deterjanı 1500 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 2600 Ml",
+                "migros_source_product_name": None,
+            },
+        ]
+    )
+
+    sections = build_search_group_sections(catalog_df, "fairy")
+    assert all(
+        not (
+            group.get("selection_type") == "product_family"
+            and group.get("family_label") == "Elma"
+        )
+        for group in sections["related_groups"]
+    )
+
+
+def test_search_pril_does_not_collapse_related_group_to_elma_family():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "bulasik deterjani elma pril sivi",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Pril Sıvı Bulaşık Deterjanı Elma 650 Ml",
+            },
+            {
+                "standardized_product_name": "bulasik deterjani pril sivi",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Pril Sıvı Bulaşık Deterjanı 2,5 Kg",
+                "migros_source_product_name": None,
+            },
+        ]
+    )
+
+    sections = build_search_group_sections(catalog_df, "pril")
+    assert all(
+        not (
+            group.get("selection_type") == "product_family"
+            and group.get("family_label") == "Elma"
+        )
+        for group in sections["related_groups"]
+    )
+
+
+def test_search_generic_finish_prefers_tablet_before_salt_rinse_aid_and_cleaner():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "tuz 1300 g",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Finish Bulaşık Makinesi Tuzu 1300 G",
+                "migros_source_product_name": "Finish Bulaşık Makinesi Tuzu 1.3 Kg",
+            },
+            {
+                "standardized_product_name": "101li bulasik finish makinesi tableti",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Finish Bulaşık Makinesi Tableti 101'li",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "bulasik finish makinesi parlaticisi",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Finish Bulaşık Makinesi Parlatıcısı 400 Ml",
+            },
+            {
+                "standardized_product_name": "bulasik finish makinesi temizleyici",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Finish Bulaşık Makinesi Temizleyici 250 Ml",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "finish"))[0] == (
+        "101li bulasik finish makinesi tableti"
+    )
+
+
+def test_search_finish_tuz_prefers_finish_dishwasher_salt_and_blocks_grocery_salt():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "tuz 1300 g",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Finish Bulaşık Makinesi Tuzu 1300 G",
+                "migros_source_product_name": "Finish Bulaşık Makinesi Tuzu 1.3 Kg",
+            },
+            {
+                "standardized_product_name": "tuz 750 g",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Billur İyotlu Tuz 750 G",
+                "migros_source_product_name": "Salina İyotlu Sofra Tuzu 750 G",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "finish tuz")) == [
+        "tuz 1300 g"
+    ]
+
+
+def test_search_bulasik_tableti_does_not_select_salt_first():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "tuz 1300 g",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Finish Bulaşık Makinesi Tuzu 1300 G",
+                "migros_source_product_name": "Finish Bulaşık Makinesi Tuzu 1.3 Kg",
+            },
+            {
+                "standardized_product_name": "bulasik makinesi migros tableti ultra",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Migros Ultra Bulaşık Makinesi Tableti 30'lu",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "bulasik tableti"))[0] == (
+        "bulasik makinesi migros tableti ultra"
+    )
+
+
+def test_search_bulasik_deterjani_does_not_select_tablet_first():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 2600 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "bulasik makinesi migros tableti ultra",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Migros Ultra Bulaşık Makinesi Tableti 30'lu",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "bulasik deterjani"))[0] == (
+        "bulasik deterjani fairy sivi"
+    )
+
+
+def test_search_generic_fairy_prefers_single_pack_liquid_over_bundles_and_spray():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "2x1500 bulasik deterjani fairy",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Bulaşık Deterjanı 2x1500 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "6x650 bulasik deterjani fairy",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Bulaşık Deterjanı 6x650 Ml",
+            },
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 1500 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "fairy power sprey",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Power Sprey 500 Ml",
+            },
+        ]
+    )
+
+    ranked = product_names(search_product_catalog(catalog_df, "fairy"))
+    assert ranked[0] == "bulasik deterjani fairy sivi"
+    assert ranked.index("2x1500 bulasik deterjani fairy") > ranked.index(
+        "bulasik deterjani fairy sivi"
+    )
+    assert ranked.index("6x650 bulasik deterjani fairy") > ranked.index(
+        "bulasik deterjani fairy sivi"
+    )
+    assert ranked.index("fairy power sprey") > ranked.index(
+        "bulasik deterjani fairy sivi"
+    )
+
+
+def test_search_generic_pril_prefers_single_pack_liquid_over_bundle():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "2x675 bulasik deterjani pril",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Pril Bulaşık Deterjanı 2x675 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "bulasik deterjani pril",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Pril Bulaşık Deterjanı 653 Ml",
+            },
+        ]
+    )
+
+    ranked = product_names(search_product_catalog(catalog_df, "pril"))
+    assert ranked[0] == "bulasik deterjani pril"
+    assert ranked.index("2x675 bulasik deterjani pril") > ranked.index(
+        "bulasik deterjani pril"
+    )
+
+
+def test_search_explicit_fairy_2x1500_prefers_matching_bundle():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "2x1500 bulasik deterjani fairy",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Bulaşık Deterjanı 2x1500 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 1500 Ml",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy 2x1500"))[0] == (
+        "2x1500 bulasik deterjani fairy"
+    )
+
+
+def test_search_explicit_fairy_6x650_prefers_matching_bundle():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "6x650 bulasik deterjani fairy",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Bulaşık Deterjanı 6x650 Ml",
+            },
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 1500 Ml",
+                "migros_source_product_name": None,
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy 6x650"))[0] == (
+        "6x650 bulasik deterjani fairy"
+    )
+
+
+def test_search_explicit_fairy_sprey_prefers_spray():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "fairy power sprey",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Power Sprey 500 Ml",
+            },
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 1500 Ml",
+                "migros_source_product_name": None,
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy sprey"))[0] == (
+        "fairy power sprey"
+    )
+
+
+def test_search_explicit_fairy_tablet_prefers_tablet():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "22'li fairy kokulu limon platinum plus tablet",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Platinum Plus Bulaşık Makinesi Tableti 22'li",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 1500 Ml",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy tablet"))[0] == (
+        "22'li fairy kokulu limon platinum plus tablet"
+    )
+
+
+def test_search_fairy_650_prefers_650_ml_single_pack_product():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "6x650 bulasik deterjani fairy",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Bulaşık Deterjanı 6x650 Ml",
+            },
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 650 Ml",
+                "migros_source_product_name": None,
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy 650"))[0] == (
+        "bulasik deterjani fairy sivi"
+    )
+
+
+def test_search_fairy_1500_prefers_1500_ml_single_pack_over_2x1500_bundle():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "2x1500 bulasik deterjani fairy",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Bulaşık Deterjanı 2x1500 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "bulasik deterjani fairy sivi",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 1500 Ml",
+            },
+        ]
+    )
+
+    ranked = product_names(search_product_catalog(catalog_df, "fairy 1500"))
+    assert ranked[0] == "bulasik deterjani fairy sivi"
+    assert ranked.index("2x1500 bulasik deterjani fairy") > ranked.index(
+        "bulasik deterjani fairy sivi"
+    )
+
+
+def test_search_bulasik_tableti_turkish_and_ascii_queries_have_equivalent_top_intent():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "bulasik makinesi migros tableti ultra",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Migros Ultra Bulaşık Makinesi Tableti 30'lu",
+            },
+            {
+                "standardized_product_name": "tuz 1300 g",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Finish Bulaşık Makinesi Tuzu 1300 G",
+                "migros_source_product_name": "Finish Bulaşık Makinesi Tuzu 1.3 Kg",
+            },
+        ]
+    )
+
+    top_ascii = product_names(search_product_catalog(catalog_df, "bulasik tableti"))[0]
+    top_turkish = product_names(
+        search_product_catalog(catalog_df, "bulaşık tableti")
+    )[0]
+    top_ascii_singular = product_names(
+        search_product_catalog(catalog_df, "bulasik tablet")
+    )[0]
+    top_turkish_singular = product_names(
+        search_product_catalog(catalog_df, "bulaşık tablet")
+    )[0]
+
+    assert top_ascii == "bulasik makinesi migros tableti ultra"
+    assert top_turkish == top_ascii
+    assert top_ascii_singular == top_ascii
+    assert top_turkish_singular == top_ascii
+
+
+def test_search_fairy_elma_1500_prefers_comparable_grouped_pair():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "fairy elma bulasik deterjani 1.5 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Elma Bulaşık Deterjanı 1500 Ml",
+                "migros_source_product_name": "Fairy Temiz & Ferah Elma Kokulu Elde Yıkama 1.5 L",
+            },
+            {
+                "standardized_product_name": "fairy limon bulasik deterjani 0.65 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Limon Bulaşık Deterjanı 650 Ml",
+                "migros_source_product_name": "Fairy Limon Kokulu Elde Yıkama 650 Ml",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy elma 1500"))[0] == (
+        "fairy elma bulasik deterjani 1.5 l"
+    )
+
+
+def test_search_fairy_elma_prefers_comparable_grouped_pair():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "fairy elma bulasik deterjani 1.5 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Elma BulaÅŸÄ±k DeterjanÄ± 1500 Ml",
+                "migros_source_product_name": "Fairy Temiz & Ferah Elma Kokulu Elde YÄ±kama 1.5 L",
+            },
+            {
+                "standardized_product_name": "fairy limon bulasik deterjani 0.65 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Limon BulaÅŸÄ±k DeterjanÄ± 650 Ml",
+                "migros_source_product_name": "Fairy Limon Kokulu Elde YÄ±kama 650 Ml",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy elma"))[0] == (
+        "fairy elma bulasik deterjani 1.5 l"
+    )
+
+
+def test_search_query_normalization_handles_fairy_limon_and_fairy_lemon():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "fairy limon bulasik deterjani 0.65 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Limon Bulaşık Deterjanı 650 Ml",
+                "migros_source_product_name": "Fairy Lemon Kokulu Elde Yıkama 650 Ml",
+            },
+            {
+                "standardized_product_name": "fairy elma bulasik deterjani 1.5 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Elma Bulaşık Deterjanı 1500 Ml",
+                "migros_source_product_name": "Fairy Elma Kokulu Elde Yıkama 1.5 L",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy limon"))[0] == (
+        "fairy limon bulasik deterjani 0.65 l"
+    )
+    assert product_names(search_product_catalog(catalog_df, "fairy lemon"))[0] == (
+        "fairy limon bulasik deterjani 0.65 l"
+    )
+
+
+def test_search_query_normalization_handles_finish_power_bingo_limon_and_pril_sirke():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "finish power bulasik tableti 40 li",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Finish Power Bulaşık Makinesi Tableti 40'lı",
+                "migros_source_product_name": "Finish Power Tablet 40'lı",
+            },
+            {
+                "standardized_product_name": "bingo limon bulasik deterjani 1.5 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Bingo Limon Bulaşık Deterjanı 1.5 L",
+                "migros_source_product_name": "Bingo Limon Kokulu Elde Yıkama 1500 Ml",
+            },
+            {
+                "standardized_product_name": "pril sirke bulasik deterjani 0.65 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Pril Sirke Gücü Bulaşık Deterjanı 650 Ml",
+                "migros_source_product_name": "Pril Vinegar 650 Ml",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "finish power"))[0] == (
+        "finish power bulasik tableti 40 li"
+    )
+    assert product_names(search_product_catalog(catalog_df, "bingo limon"))[0] == (
+        "bingo limon bulasik deterjani 1.5 l"
+    )
+    assert product_names(search_product_catalog(catalog_df, "pril sirke"))[0] == (
+        "pril sirke bulasik deterjani 0.65 l"
+    )
+
+
+def test_search_query_normalization_handles_ascii_and_turkish_cleaning_queries():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "domestos ultra camasir suyu",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Domestos Ultra Çamaşır Suyu 750 Ml",
+                "migros_source_product_name": "Domestos Ultra Çamaşır Suyu 750 Ml",
+            },
+            {
+                "standardized_product_name": "fairy bulasik deterjani 0.65 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 650 ml",
+                "migros_source_product_name": "Fairy Sıvı Bulaşık Deterjanı Limon 650 Ml",
+            },
+            {
+                "standardized_product_name": "solo kagit havlu 6 roll",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Solo Bambu Kağıt Havlu 2 Katlı 6'lı",
+                "migros_source_product_name": "Solo Bambu Katkılı Havlu 6'lı",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "çamaşır suyu"))[0] == (
+        "domestos ultra camasir suyu"
+    )
+    assert product_names(search_product_catalog(catalog_df, "camasir suyu"))[0] == (
+        "domestos ultra camasir suyu"
+    )
+    assert product_names(search_product_catalog(catalog_df, "bulaşık deterjanı"))[0] == (
+        "fairy bulasik deterjani 0.65 l"
+    )
+    assert product_names(search_product_catalog(catalog_df, "bulasik deterjani"))[0] == (
+        "fairy bulasik deterjani 0.65 l"
+    )
+    assert product_names(search_product_catalog(catalog_df, "kağıt havlu"))[0] == (
+        "solo kagit havlu 6 roll"
+    )
+    assert product_names(search_product_catalog(catalog_df, "kagit havlu"))[0] == (
+        "solo kagit havlu 6 roll"
+    )
+
+
+def test_search_generic_fairy_prefers_comparable_group_over_single_market_rows():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "fairy bulasik deterjani 0.65 l",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 650 ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "fairy bulasik deterjani 1 l",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 1 L",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "fairy elma bulasik deterjani 1.5 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Elma Bulaşık Deterjanı 1500 Ml",
+                "migros_source_product_name": "Fairy Temiz & Ferah Elma Kokulu Elde Yıkama 1.5 L",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "fairy"))[0] == (
+        "fairy elma bulasik deterjani 1.5 l"
+    )
+
+
+def test_build_search_group_sections_generic_fairy_keeps_comparable_group_as_main_selection():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "fairy bulasik deterjani 0.65 l",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Fairy Sıvı Bulaşık Deterjanı 650 ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "fairy elma bulasik deterjani 1.5 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Elma Bulaşık Deterjanı 1500 Ml",
+                "migros_source_product_name": "Fairy Temiz & Ferah Elma Kokulu Elde Yıkama 1.5 L",
+            },
+        ]
+    )
+
+    sections = build_search_group_sections(catalog_df, "fairy")
+
+    assert sections["safe_groups"][0]["selection_id"] == (
+        "product:fairy elma bulasik deterjani 1.5 l"
+    )
+    assert sections["related_groups"][0]["selection_id"] == (
+        "product:fairy bulasik deterjani 0.65 l"
+    )
+
+
+def test_search_generic_domestos_prefers_bleach_over_surface_cleaner():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "domestos kopuk mutfak",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Domestos Banyo & Mutfak Köpük 500 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "domestos ultra camasir suyu",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Domestos Ultra Çamaşır Suyu 750 Ml",
+            },
+        ]
+    )
+
+    assert product_names(search_product_catalog(catalog_df, "domestos"))[0] == (
+        "domestos ultra camasir suyu"
+    )
