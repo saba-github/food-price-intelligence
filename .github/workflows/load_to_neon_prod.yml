@@ -70,3 +70,39 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}
           PYTHONUNBUFFERED: "1"
         run: python -m pipeline.run_pipeline --retailer migros --category ${{ matrix.category }}
+
+  run-etl-a101:
+    needs: migrate-prod
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # A101 config has no "beverages" key (see config/retailers.py).
+        category: [fruit_veg, dairy_breakfast]
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Playwright browsers
+        run: |
+          python -m playwright install --with-deps chromium
+
+      - name: Run A101 ETL pipeline (PROD)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PROD }}
+          PYTHONPATH: ${{ github.workspace }}
+          PYTHONUNBUFFERED: "1"
+        run: python -m pipeline.run_pipeline --retailer a101 --category ${{ matrix.category }}
