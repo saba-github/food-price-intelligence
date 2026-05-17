@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from app.search_selection import (
     build_brand_filter_options,
@@ -1476,3 +1477,37 @@ def test_brand_only_cleaning_query_detection_does_not_misclassify_domates_or_typ
 def test_detect_search_mode_keeps_domates_and_brand_typos_out_of_brand_mode():
     assert detect_search_mode("domates") == CLEANING_SEARCH_MODE_SPECIFIC
     assert detect_search_mode("fary") == CLEANING_SEARCH_MODE_SPECIFIC
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_mode"),
+    [
+        ("fairy", CLEANING_SEARCH_MODE_BRAND),
+        ("finish", CLEANING_SEARCH_MODE_BRAND),
+        ("domestos", CLEANING_SEARCH_MODE_BRAND),
+        ("fary", CLEANING_SEARCH_MODE_SPECIFIC),
+        ("domates", CLEANING_SEARCH_MODE_SPECIFIC),
+        ("salatalik", CLEANING_SEARCH_MODE_SPECIFIC),
+        ("hiyar", CLEANING_SEARCH_MODE_SPECIFIC),
+        ("sut", CLEANING_SEARCH_MODE_SPECIFIC),
+        ("su", CLEANING_SEARCH_MODE_SPECIFIC),
+        ("tuvalet kagidi", CLEANING_SEARCH_MODE_SPECIFIC),
+        ("bulasik tableti", CLEANING_SEARCH_MODE_CATEGORY),
+    ],
+)
+def test_golden_query_search_modes_stay_stable(query, expected_mode):
+    assert detect_search_mode(query) == expected_mode
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_brand_token"),
+    [
+        ("fairy", "fairy"),
+        ("fary", "fairy"),
+        ("domestos", "domestos"),
+    ],
+)
+def test_golden_brand_and_typo_queries_resolve_to_expected_cleaning_brand(
+    query, expected_brand_token
+):
+    assert resolved_cleaning_brand_token(query) == expected_brand_token

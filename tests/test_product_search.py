@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 
 from pipeline.optimizer.product_search import (
     build_search_group_sections,
@@ -34,6 +35,157 @@ def make_catalog(rows):
 
 def product_names(search_results):
     return search_results["standardized_product_name"].tolist()
+
+
+def make_golden_query_catalog():
+    return pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "domates",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Domates Kg",
+                "migros_source_product_name": "Domates Kg",
+            },
+            {
+                "standardized_product_name": "domates kokteyl",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparison_review_required",
+                "a101_source_product_name": "Kokteyl Domates 500 G",
+                "migros_source_product_name": "Kokteyl Domates 500 G",
+            },
+            {
+                "standardized_product_name": "zeytinyagi 200 g",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Domatesli Zeytinyagi 200 G",
+                "migros_source_product_name": "Domatesli Zeytinyagi 200 G",
+            },
+            {
+                "standardized_product_name": "hiyar",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Salatalik Kg",
+                "migros_source_product_name": "Hiyar Kg",
+            },
+            {
+                "standardized_product_name": "sek sut",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Sek Sut 1 L",
+                "migros_source_product_name": "Sek Sut 1 L",
+            },
+            {
+                "standardized_product_name": "alpimilk cikolatali sut",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Alpimilk Cikolatali Sut 180 Ml",
+            },
+            {
+                "standardized_product_name": "su 0.5 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Su 0.5 L",
+                "migros_source_product_name": "Su 0.5 L",
+            },
+            {
+                "standardized_product_name": "hayat su 1.5 l",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Hayat Su 1.5 L",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "kola coca-cola 1 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Coca-Cola 1 L",
+                "migros_source_product_name": "Coca-Cola 1 L",
+            },
+            {
+                "standardized_product_name": "maden suyu 0.2 l",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Maden Suyu 200 Ml",
+            },
+            {
+                "standardized_product_name": "fairy bulasik deterjani 0.65 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Sivi Bulasik Deterjani 650 ml",
+                "migros_source_product_name": "Fairy Sivi Bulasik Deterjani Limon 650 Ml",
+            },
+            {
+                "standardized_product_name": "fairy power sprey 0.5 l",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Fairy Power Sprey 500 Ml",
+                "migros_source_product_name": "Fairy Power Sprey 500 Ml",
+            },
+            {
+                "standardized_product_name": "30'lu fairy platinum tablet",
+                "source_count": 1,
+                "available_retailers": "migros",
+                "coverage_status": "only_migros",
+                "a101_source_product_name": None,
+                "migros_source_product_name": "Fairy Platinum Bulasik Makinesi Tableti 30'lu",
+            },
+            {
+                "standardized_product_name": "domestos ultra camasir suyu",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Domestos Ultra Camasir Suyu 750 Ml",
+                "migros_source_product_name": "Domestos Ultra Camasir Suyu 750 Ml",
+            },
+            {
+                "standardized_product_name": "domestos kopuk mutfak",
+                "source_count": 1,
+                "available_retailers": "a101",
+                "coverage_status": "only_a101",
+                "a101_source_product_name": "Domestos Banyo Mutfak Kopuk 500 Ml",
+                "migros_source_product_name": None,
+            },
+            {
+                "standardized_product_name": "solo tuvalet kagidi 16 roll",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Solo Tuvalet Kagidi 16'li",
+                "migros_source_product_name": "Solo Tuvalet Kagidi 16'li",
+            },
+            {
+                "standardized_product_name": "finish bulasik makinesi tableti 101 li",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Finish Bulasik Makinesi Tableti 101'li",
+                "migros_source_product_name": "Finish Bulasik Makinesi Tableti 101'li",
+            },
+            {
+                "standardized_product_name": "finish bulasik makinesi tuzu 1300 g",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Finish Bulasik Makinesi Tuzu 1300 G",
+                "migros_source_product_name": "Finish Bulasik Makinesi Tuzu 1300 G",
+            },
+        ]
+    )
 
 
 def test_search_uses_aliases_and_synonyms():
@@ -2333,3 +2485,46 @@ def test_search_domates_keeps_exact_produce_matches_and_excludes_domatesli_oil_r
 
     assert ranked[:2] == ["domates", "domates kokteyl"]
     assert "zeytinyagi 200 g" not in ranked
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_top"),
+    [
+        ("domates", "domates"),
+        ("salatalik", "hiyar"),
+        ("hiyar", "hiyar"),
+        ("sut", "sek sut"),
+        ("su", "su 0.5 l"),
+        ("domestos", "domestos ultra camasir suyu"),
+        ("tuvalet kagidi", "solo tuvalet kagidi 16 roll"),
+        ("bulasik tableti", "finish bulasik makinesi tableti 101 li"),
+        ("finish", "finish bulasik makinesi tableti 101 li"),
+    ],
+)
+def test_golden_queries_return_expected_non_empty_top_matches(query, expected_top):
+    catalog_df = make_golden_query_catalog()
+
+    ranked = product_names(search_product_catalog(catalog_df, query))
+
+    assert ranked, f"Expected non-empty search results for query: {query}"
+    assert ranked[0] == expected_top
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_brand_token"),
+    [
+        ("fairy", "fairy"),
+        ("finish", "finish"),
+        ("domestos", "domestos"),
+    ],
+)
+def test_golden_brand_queries_keep_brand_relevant_groups(query, expected_brand_token):
+    catalog_df = make_golden_query_catalog()
+
+    sections = build_search_group_sections(catalog_df, query)
+    grouped_results = sections["safe_groups"] + sections["related_groups"]
+
+    assert grouped_results, f"Expected non-empty grouped results for query: {query}"
+    top_group = grouped_results[0]
+    top_product_names = " ".join(top_group.get("product_names") or [])
+    assert expected_brand_token in top_product_names
