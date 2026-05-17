@@ -14,6 +14,8 @@ from pipeline.optimizer.cleaning_products import (
     preferred_cleaning_subtypes,
 )
 from pipeline.transforms import (
+    PRODUCE_BASE_TOKENS,
+    canonicalize_produce_name,
     infer_paper_product_profile,
     normalize_text,
     standardize_product_name,
@@ -417,6 +419,10 @@ def _token_list(value: str) -> list[str]:
     return re.findall(r"[a-z0-9]+", _standardized(value))
 
 
+def _raw_token_set(value: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", normalize_text(value)))
+
+
 def _contains_token_sequence(haystack: list[str], needle: list[str]) -> bool:
     if not haystack or not needle or len(needle) > len(haystack):
         return False
@@ -615,6 +621,32 @@ def _match_product(product_name_or_row, exact_query: str, variants: list[str]):
         if any(token in combined_tokens for token in excluded_tokens):
             return None
 
+    strict_produce_token = _strict_produce_query_token(exact_query, variants)
+    if strict_produce_token:
+        produce_family_id = get_product_family_id(strict_produce_token)
+        family_raw_tokens: set[str] = set()
+        if produce_family_id and produce_family_id in PRODUCT_FAMILY_DEFINITIONS:
+            for term in PRODUCT_FAMILY_DEFINITIONS[produce_family_id]["terms"]:
+                family_raw_tokens.update(_raw_token_set(term))
+        matched_produce_candidate = False
+        for value in candidate_values:
+            if not value:
+                continue
+            raw_tokens = _raw_token_set(value)
+            canonical_tokens = set(_token_list(canonicalize_produce_name(value) or ""))
+            candidate_family_id = get_product_family_id(value)
+            if (
+                strict_produce_token in raw_tokens
+                or strict_produce_token in canonical_tokens
+                or bool(family_raw_tokens & raw_tokens)
+                or (produce_family_id is not None and candidate_family_id == produce_family_id)
+            ):
+                matched_produce_candidate = True
+                break
+
+        if candidate_values and not matched_produce_candidate:
+            return None
+
     requested_roll_count = _explicit_roll_count_query(exact_query, variants)
     if requested_roll_count is not None:
         candidate_roll_counts: set[float] = set()
@@ -696,6 +728,20 @@ def _query_token_set(exact_query: str, variants: list[str]) -> set[str]:
             continue
         query_tokens.update(_token_set(value))
     return query_tokens
+
+
+def _strict_produce_query_token(exact_query: str, variants: list[str]) -> str | None:
+    query_candidates = [exact_query, *variants]
+    for value in query_candidates:
+        if not value:
+            continue
+        canonical_name = canonicalize_produce_name(value)
+        if not canonical_name:
+            continue
+        canonical_tokens = _token_list(canonical_name)
+        if len(canonical_tokens) == 1 and canonical_tokens[0] in PRODUCE_BASE_TOKENS:
+            return canonical_tokens[0]
+    return None
 
 
 def _explicit_subtype_family_id(query_tokens: set[str]) -> str | None:

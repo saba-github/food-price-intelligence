@@ -140,7 +140,7 @@ def resolved_cleaning_brand_token(search_text: str) -> str | None:
 
 def is_brand_only_cleaning_query(search_text: str) -> bool:
     tokens = cleaning_tokens(search_text)
-    return len(tokens) == 1 and resolved_cleaning_brand_token(search_text) is not None
+    return len(tokens) == 1 and cleaning_brand_from_query_tokens(tokens) is not None
 
 
 def detect_search_mode(search_text: str) -> str:

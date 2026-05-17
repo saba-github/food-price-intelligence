@@ -9,6 +9,11 @@ with latest_data as (
     select max(date) as latest_data_date
     from mart_daily_prices
 ),
+latest_price_observation as (
+    select max(observed_at) as latest_price_observed_at
+    from price_history
+    where price is not null
+),
 latest_success_run as (
     select max(started_at) as latest_success_started_at
     from scrape_runs
@@ -26,12 +31,14 @@ latest_attempt as (
 )
 select
     ld.latest_data_date,
+    lpo.latest_price_observed_at,
     lsr.latest_success_started_at,
     la.latest_run_source_name,
     la.latest_run_status,
     la.latest_run_started_at,
     la.latest_run_error_message
 from latest_data ld
+cross join latest_price_observation lpo
 cross join latest_success_run lsr
 cross join latest_attempt la
 """

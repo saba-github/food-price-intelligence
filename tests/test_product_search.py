@@ -2299,3 +2299,37 @@ def test_search_generic_domestos_prefers_bleach_over_surface_cleaner():
     assert product_names(search_product_catalog(catalog_df, "domestos"))[0] == (
         "domestos ultra camasir suyu"
     )
+def test_search_domates_keeps_exact_produce_matches_and_excludes_domatesli_oil_rows():
+    catalog_df = pd.DataFrame(
+        [
+            {
+                "standardized_product_name": "domates",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Domates Kg",
+                "migros_source_product_name": "Domates Kg",
+            },
+            {
+                "standardized_product_name": "domates kokteyl",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparison_review_required",
+                "a101_source_product_name": "Kokteyl Domates 500 G",
+                "migros_source_product_name": "Kokteyl Domates 500 G",
+            },
+            {
+                "standardized_product_name": "zeytinyagi 200 g",
+                "source_count": 2,
+                "available_retailers": "a101, migros",
+                "coverage_status": "comparable",
+                "a101_source_product_name": "Domatesli Zeytinyağı 200 G",
+                "migros_source_product_name": "Domatesli Zeytinyağı 200 G",
+            },
+        ]
+    )
+
+    ranked = product_names(search_product_catalog(catalog_df, "domates"))
+
+    assert ranked[:2] == ["domates", "domates kokteyl"]
+    assert "zeytinyagi 200 g" not in ranked

@@ -1466,3 +1466,13 @@ def test_sort_specific_result_rows_demotes_generic_finish_rows_below_power_famil
         "Finish Quantum Powerball Bulaşık Tableti 40'lı",
         "Finish Ultimate Plus Bulaşık Tableti 50'li",
     ]
+
+
+def test_brand_only_cleaning_query_detection_does_not_misclassify_domates_or_typos():
+    assert is_brand_only_cleaning_query("domates") is False
+    assert is_brand_only_cleaning_query("fary") is False
+
+
+def test_detect_search_mode_keeps_domates_and_brand_typos_out_of_brand_mode():
+    assert detect_search_mode("domates") == CLEANING_SEARCH_MODE_SPECIFIC
+    assert detect_search_mode("fary") == CLEANING_SEARCH_MODE_SPECIFIC

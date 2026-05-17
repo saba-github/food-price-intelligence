@@ -172,6 +172,24 @@ def format_metric_value(value):
     return str(value)
 
 
+def freshness_display_model(freshness_row: dict | None) -> dict[str, str]:
+    if not freshness_row:
+        return {
+            "latest_success": "-",
+            "latest_price_observation": "-",
+            "latest_data_date": "-",
+        }
+
+    return {
+        "latest_success": format_metric_value(freshness_row.get("latest_success_started_at")),
+        "latest_price_observation": format_metric_value(
+            freshness_row.get("latest_price_observed_at")
+            or freshness_row.get("latest_data_date")
+        ),
+        "latest_data_date": format_metric_value(freshness_row.get("latest_data_date")),
+    }
+
+
 def build_catalog_cache_key(freshness_row: dict | None) -> str | None:
     if not freshness_row:
         return None
@@ -959,9 +977,7 @@ def render_result_card(
     status_class = status_theme(status_label)
     product_title = result_title(group, recommendation)
     chosen_option = chosen_option_label(recommendation)
-    freshness_text = "-"
-    if freshness_row:
-        freshness_text = format_metric_value(freshness_row.get("latest_success_started_at"))
+    freshness_text = freshness_display_model(freshness_row)["latest_success"]
     explanation_text = normalization_explanation(
         recommendation,
         display_recommendation,
@@ -1046,7 +1062,7 @@ def render_result_card(
         f'<div class="status-pill {status_class}">{status_label}</div>'
         '</div>'
         '<div>'
-        '<div class="result-card__meta-label">Veri tazeliği</div>'
+        '<div class="result-card__meta-label">Son başarılı tarama</div>'
         f'<div class="result-card__meta-value">{freshness_text}</div>'
         '</div>'
         '</div>'
@@ -1177,6 +1193,7 @@ def render_freshness_card(freshness_row: dict) -> None:
     latest_run_source_name = freshness_row.get("latest_run_source_name")
     latest_run_started_at = freshness_row.get("latest_run_started_at")
     latest_run_error_message = freshness_row.get("latest_run_error_message")
+    freshness_model = freshness_display_model(freshness_row)
     is_stale = latest_run_status == "failed"
     status_class = (
         "freshness-card__status freshness-card__status--warning"
@@ -1192,12 +1209,16 @@ def render_freshness_card(freshness_row: dict) -> None:
             <div class="freshness-card__header">
                 <div class="freshness-card__details">
                     <p class="freshness-card__line">
-                        <span>Son fiyat tarihi</span>
-                        <strong>{format_metric_value(freshness_row.get("latest_data_date"))}</strong>
+                        <span>Son başarılı tarama</span>
+                        <strong>{freshness_model["latest_success"]}</strong>
                     </p>
                     <p class="freshness-card__line">
-                        <span>Son başarılı güncelleme</span>
-                        <strong>{format_metric_value(freshness_row.get("latest_success_started_at"))}</strong>
+                        <span>En yeni fiyat gözlemi</span>
+                        <strong>{freshness_model["latest_price_observation"]}</strong>
+                    </p>
+                    <p class="freshness-card__line">
+                        <span>Günlük fiyat özeti tarihi</span>
+                        <strong>{freshness_model["latest_data_date"]}</strong>
                     </p>
                 </div>
                 <div class="{status_class}">
@@ -1206,7 +1227,7 @@ def render_freshness_card(freshness_row: dict) -> None:
                 </div>
             </div>
             <p class="freshness-card__note">
-                Veri canlı değildir; son başarılı güncelleme zamanına göre gösterilir.
+                Tarama zamanı, en yeni fiyat gözlemi ve günlük özet tarihi ayrı gösterilir.
             </p>
         </div>
         """,
